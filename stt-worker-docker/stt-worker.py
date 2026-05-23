@@ -20,7 +20,7 @@ TTS_WORKER_URL = os.getenv("TTS_WORKER_URL", "http://127.0.0.1:8001/process")
 # 모델 로드 (Faster-Whisper & Silero VAD)
 base_dir = os.path.dirname(os.path.abspath(__file__))
 whisper_model_path = os.path.join(base_dir, "model", "whisper")
-model = WhisperModel(whisper_model_path, device="cuda", compute_type="int8_float16", local_files_only=True)
+model = WhisperModel(whisper_model_path, device="cuda", compute_type="float16", local_files_only=True)
 
 # Silero VAD 모델 로드
 vad_model_path = os.path.join(base_dir, "model", "silero_vad", "silero_vad.onnx")

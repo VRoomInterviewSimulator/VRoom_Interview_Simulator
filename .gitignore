@@ -81,20 +81,16 @@ crashlytics-build.properties
 # Secrets — API keys must not be committed
 **/.env
 
-# Model weights — download from Google Drive instead
-stt-worker-docker/*.bin
-stt-worker-docker/*.pth
-stt-worker-docker/*.safetensors
-stt-worker-docker/*.ckpt
-stt-worker-docker/*.onnx
-stt-worker-docker/models/
+# Model directory (singular 'model' is the actual folder name)
+stt-worker-docker/model/
+tts-worker-docker/model/
 
-tts-worker-docker/*.bin
-tts-worker-docker/*.pth
-tts-worker-docker/*.safetensors
-tts-worker-docker/*.ckpt
-tts-worker-docker/*.onnx
-tts-worker-docker/models/
+# Catch-all for model file extensions anywhere in the repo
+**/*.pth
+**/*.bin
+**/*.safetensors
+**/*.ckpt
+**/*.onnx
 
 # Reference voice
 tts-worker-docker/speaker.wav
