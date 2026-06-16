@@ -59,21 +59,25 @@ namespace VerbalProcess
 
         public void HandleAudioChunkReceived(byte[] pcmData)
         {
+            // 4바이트(float 1개 크기)조차 안 되는 자투리 데이터는 무시
             if (pcmData == null || pcmData.Length < 4) return;
 
-            // 최적화: 개별 형변환 대신 BlockCopy로 메모리 통째로 복사 (초고속)
+            // 1. 32-bit Float (4바이트) 규격에 맞게 샘플 개수 계산
             int sampleCount = pcmData.Length / 4;
             float[] floatArray = new float[sampleCount];
-            Buffer.BlockCopy(pcmData, 0, floatArray, 0, pcmData.Length);
 
-            _audioChunkQueue.Enqueue(floatArray);
-            _playbackFinishedEventFired = false;
-            _isEndOfStream = false;
-
-            // 초기 버퍼링 확인 (로그 출력용)
-            if (_audioChunkQueue.Count == bufferThresholdChunks)
+            // 2. 바이트 배열에서 4바이트씩 묶어 float(실수)로 정확하게 변환
+            for (int i = 0; i < sampleCount; i++)
             {
-                Debug.Log($"[Speaker] Buffer threshold reached. Audio streaming stabilized.");
+                floatArray[i] = BitConverter.ToSingle(pcmData, i * 4);
+            }
+
+            // 3. 변환된 오디오 데이터를 재생 큐(Queue)에 장전
+            _audioChunkQueue.Enqueue(floatArray);
+
+            if (!_playbackFinishedEventFired && _audioChunkQueue.Count >= bufferThresholdChunks)
+            {
+                Debug.Log("[Speaker] Buffer threshold reached. Audio streaming stabilized.");
             }
         }
 
