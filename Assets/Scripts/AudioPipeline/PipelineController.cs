@@ -30,7 +30,7 @@ namespace VerbalProcess
                 sttManager.OnServerRequestEnd += HandleServerRequestEnd;
                 sttManager.OnTranscriptionReceived += HandleTranscriptionReceived;
                 sttManager.OnAudioStreamEnded += HandleAudioStreamEnded;
-                
+
                 if (speaker != null)
                 {
                     sttManager.OnAudioChunkReceived += speaker.HandleAudioChunkReceived;
@@ -89,7 +89,7 @@ namespace VerbalProcess
         {
             Debug.Log($"<color=cyan>[Pipeline] Final STT Result: {response.data.sttText}</color>");
             Debug.Log($"[Pipeline] Stats - Time: {response.data.speakingTime:F2}s, Pauses: {response.data.pauseCount}, Vol: {response.data.averageVolume:F4}");
-            
+
             // STT 결과는 UI 업데이트 등에 활용하며, VAD 재활성화는 오디오 재생 종료 시(HandlePlaybackFinished) 수행합니다.
         }
 
@@ -133,7 +133,7 @@ namespace VerbalProcess
             try
             {
                 Debug.Log("Pipeline: Utterance ended. Sending Feature via WebSocket...");
-                
+
                 // 데이터 패키징
                 FeatureData featureData = new FeatureData(features);
 

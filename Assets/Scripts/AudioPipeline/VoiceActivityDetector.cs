@@ -47,8 +47,6 @@ namespace VerbalProcess
 
         void Start()
         {
-            foreach (var device in Microphone.devices)
-                Debug.Log("사용 가능한 마이크: " + device); // 콘솔에 장치 이름이 뜹니다.
             InitializeMicrophone();
             // 최대 발생 가능한 샘플 수만큼 버퍼 미리 할당 (예: 0.1초 분량이면 충분)
             reusableSampleBuffer = new float[sampleRate / 10];
@@ -56,27 +54,6 @@ namespace VerbalProcess
 
         private void InitializeMicrophone()
         {
-            string keyword = "Buds"; // 검색 키워드
-            micDevice = "";
-
-            foreach (var device in Microphone.devices)
-            {
-                if (device.Contains(keyword))
-                {
-                    micDevice = device;
-                    break;
-                }
-            }
-
-            // 2. 못 찾았으면 기본(0번) 마이크 사용
-            if (string.IsNullOrEmpty(micDevice))
-            {
-                micDevice = Microphone.devices[0];
-            }
-
-            micClip = Microphone.Start(micDevice, true, bufferLengthSeconds, sampleRate);
-            Debug.Log("Microphone started: " + micDevice);
-            /*
             if (Microphone.devices.Length > 0)
             {
                 micDevice = Microphone.devices[0];
@@ -93,7 +70,6 @@ namespace VerbalProcess
             {
                 Debug.LogError("No microphone detected!");
             }
-            */
         }
 
         void Update()
@@ -129,6 +105,7 @@ namespace VerbalProcess
                 sum += reusableSampleBuffer[i] * reusableSampleBuffer[i];
             }
             float rms = Mathf.Sqrt(sum / sampleCount);
+
             ProcessVAD(rms, audioDuration, currentPosition);
         }
 
@@ -136,7 +113,8 @@ namespace VerbalProcess
         {
             if (rms > threshold)
             {
-                if (!isSpeaking) {
+                if (!isSpeaking)
+                {
                     StartSpeaking(currentPosition);
                 }
                 else
@@ -220,7 +198,7 @@ namespace VerbalProcess
         private void EndSpeaking(int currentPosition)
         {
             isSpeaking = false;
-            
+
             // 침묵 임계값만큼 이전이 실제 발화가 종료된 시점
             int silenceSamples = (int)(silenceDurationThreshold * sampleRate);
             int utteranceEndSample = (currentPosition - silenceSamples + micClip.samples) % micClip.samples;

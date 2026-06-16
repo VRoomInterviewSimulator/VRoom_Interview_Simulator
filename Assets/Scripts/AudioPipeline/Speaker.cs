@@ -11,6 +11,7 @@ namespace VerbalProcess
         [SerializeField] private int serverSampleRate = 44100;
         [SerializeField] private float volume = 1.0f;
         [SerializeField] private int bufferThresholdChunks = 3; // 큐에 쌓일 청크 개수 기준
+        private readonly System.Collections.Generic.List<byte> _byteRemainder = new System.Collections.Generic.List<byte>();
 
         public Action OnPlaybackFinished; // 모든 버퍼 재생이 완료되었을 때 발생
 
@@ -59,27 +60,49 @@ namespace VerbalProcess
 
         public void HandleAudioChunkReceived(byte[] pcmData)
         {
-            // 4바이트(float 1개 크기)조차 안 되는 자투리 데이터는 무시
-            if (pcmData == null || pcmData.Length < 4) return;
+            if (pcmData == null || pcmData.Length == 0) return;
 
-            // 1. 32-bit Float (4바이트) 규격에 맞게 샘플 개수 계산
-            int sampleCount = pcmData.Length / 4;
-            float[] floatArray = new float[sampleCount];
-
-            // 2. 바이트 배열에서 4바이트씩 묶어 float(실수)로 정확하게 변환
-            for (int i = 0; i < sampleCount; i++)
+            // 이전에 남은 바이트와 합쳐 float(4바이트) 경계를 보존
+            byte[] buf;
+            if (_byteRemainder.Count > 0)
             {
-                floatArray[i] = BitConverter.ToSingle(pcmData, i * 4);
+                _byteRemainder.AddRange(pcmData);
+                buf = _byteRemainder.ToArray();
+                _byteRemainder.Clear();
+            }
+            else
+            {
+                buf = pcmData;
             }
 
-            // 3. 변환된 오디오 데이터를 재생 큐(Queue)에 장전
-            _audioChunkQueue.Enqueue(floatArray);
+            int sampleCount = buf.Length / 4;
+            int usableBytes = sampleCount * 4;
 
-            if (!_playbackFinishedEventFired && _audioChunkQueue.Count >= bufferThresholdChunks)
+            if (sampleCount > 0)
             {
-                Debug.Log("[Speaker] Buffer threshold reached. Audio streaming stabilized.");
+                float[] floatArray = new float[sampleCount];
+                Buffer.BlockCopy(buf, 0, floatArray, 0, usableBytes); // 정확히 완성된 float만 복사
+
+                // 안전 클램프: 혹시 모를 피크로 인한 클리핑 방지
+                for (int i = 0; i < floatArray.Length; i++)
+                {
+                    if (floatArray[i] > 1f) floatArray[i] = 1f;
+                    else if (floatArray[i] < -1f) floatArray[i] = -1f;
+                }
+
+                _audioChunkQueue.Enqueue(floatArray);
+                _playbackFinishedEventFired = false;
+                _isEndOfStream = false;
+
+                if (_audioChunkQueue.Count == bufferThresholdChunks)
+                    Debug.Log("[Speaker] Buffer threshold reached. Audio streaming stabilized.");
             }
+
+            // 4의 배수가 안 되는 끝부분 1~3바이트는 다음 청크 앞에 붙임
+            for (int i = usableBytes; i < buf.Length; i++)
+                _byteRemainder.Add(buf[i]);
         }
+
 
         /// <summary>
         /// 서버로부터 더 이상 오디오 청크가 오지 않음을 설정합니다.

@@ -31,7 +31,7 @@ namespace VerbalProcess
             if (length <= 0) return null;
 
             float[] data = new float[length];
-            
+
             if (endSample >= startSample)
             {
                 source.GetData(data, startSample);
@@ -106,7 +106,7 @@ namespace VerbalProcess
         private static float[] Resample(float[] samples, int fromRate, int toRate)
         {
             if (fromRate == toRate) return samples;
-            
+
             float ratio = (float)fromRate / toRate;
             int newLength = Mathf.FloorToInt(samples.Length / ratio);
             float[] result = new float[newLength];
