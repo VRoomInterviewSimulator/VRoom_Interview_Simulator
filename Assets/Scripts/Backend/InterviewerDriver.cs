@@ -44,16 +44,11 @@ namespace VRoom.Backend
         }
 
         // 행동 패킷 -> 표정/제스처 즉시 트리거 (음성보다 먼저 도착하므로 반응이 자연스럽다)
-        private void HandlePacket(BehaviorPacket p)
+        void HandlePacket(BehaviorPacket p)
         {
-            animator.SetInteger(ExpressionId, p.expression_id);
-            animator.SetInteger(GestureId, p.gesture_id);
-
-            if (!string.IsNullOrEmpty(p.dialogue))
-                Debug.Log($"[면접관/{p.stage}/{p.persona}] {p.dialogue}  (점수 {p.score})");
-
-            if (p.is_final)
-                _ = backend.RequestFeedback();   // 마지막 발화면 피드백 요청
+            Debug.Log($"[면접관/{p.stage}/{p.persona}] {p.dialogue} " +
+                      $"(점수 {p.score}, expr={p.expression_id}, gesture={p.gesture_id})");
+            if (p.is_final) _ = backend.RequestFeedback();
         }
 
         // PCM 음성 청크 -> Speaker.cs 로 전달. (팀 Speaker 의 실제 메서드명에 맞춰 수정)

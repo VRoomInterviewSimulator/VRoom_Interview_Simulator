@@ -185,6 +185,7 @@ namespace VerbalProcess
                                 else if (msg.type == "final")
                                 {
                                     FinalResponse response = JsonUtility.FromJson<FinalResponse>(message);
+                                    Debug.Log($"[STT 결과] {response.data.sttText}");
                                     OnTranscriptionReceived?.Invoke(response);
                                 }
                                 else if (msg.type == "tts_end")
