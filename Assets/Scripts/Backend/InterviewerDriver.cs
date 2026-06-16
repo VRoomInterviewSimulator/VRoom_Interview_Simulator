@@ -59,12 +59,14 @@ namespace VRoom.Backend
         // PCM 음성 청크 -> Speaker.cs 로 전달. (팀 Speaker 의 실제 메서드명에 맞춰 수정)
         private void HandleAudio(byte[] pcm)
         {
-            speaker.HandleAudioChunkReceived(pcm);
+            if(speaker != null)
+                speaker.HandleAudioChunkReceived(pcm);
         }
 
         private void HandleAudioEnd()
         {
-            speaker.SetEndOfStream();
+            if(speaker != null)
+                speaker.SetEndOfStream();
         }
 
         private void HandleFeedback(FeedbackReport r)
