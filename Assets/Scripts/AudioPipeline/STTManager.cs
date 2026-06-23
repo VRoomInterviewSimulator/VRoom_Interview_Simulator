@@ -12,7 +12,7 @@ namespace VerbalProcess
     /// </summary>
     public class STTManager : MonoBehaviour
     {
-        [SerializeField] private string wsUrl = "ws://127.0.0.1:8000/ws/interview";
+        [SerializeField] private string wsUrl = "ws://'음성처리서버IP'/ws/interview";
 
         public Action OnServerRequestEnd; // 서버에서 발화 종료를 감지했을 때 발생
         public Action<FinalResponse> OnTranscriptionReceived; // 최종 결과 수신
