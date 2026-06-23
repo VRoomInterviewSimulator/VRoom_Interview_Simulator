@@ -1933,7 +1933,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 55b976458d8576743a39a272599100fa, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VerbalProcess.STTManager
-  wsUrl: ws://100.125.152.48:8000/ws/interview
+  wsUrl: ws://127.0.0.1:8000/ws/interview
 --- !u!114 &817680393
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5366,7 +5366,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 00682028425111b4cb7e12a7b7564b26, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VRoom.Backend.InterviewDebugInput
-  backendHttp: http://192.168.200.182:8080/process
+  backendHttp: http://127.0.0.1:8080/process
   sessionId: default
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
