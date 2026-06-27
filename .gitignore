@@ -98,3 +98,9 @@ tts-worker-docker/speaker.wav
 # Python cache
 **/__pycache__/
 **/*.pyc
+
+# Antigravity related folders
+antigravity/
+.gemini/
+.agents/
+gemini.md
