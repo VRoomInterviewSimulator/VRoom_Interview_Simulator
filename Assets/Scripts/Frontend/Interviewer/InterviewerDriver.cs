@@ -4,23 +4,32 @@ using VerbalProcess;
 namespace VRoom.Backend
 {
     /// <summary>
-    /// 백엔드 이벤트를 실제 면접관 캐릭터에 연결하는 예시 드라이버.
-    /// 이 파일은 '어떻게 연결하는지' 보여주는 샘플이므로 프로젝트 구조에 맞게 수정해서 쓰면 된다.
+    /// 백엔드 이벤트를 실제 면접관 캐릭터에 연결하는 드라이버.
+    /// persona -> Emotion(감정 축), 오디오 재생 여부 -> Speaking(발화 축) 으로
+    /// Animator Blend Tree 를 구동하고, expression_id 는 얼굴 BlendShape 로 넘긴다.
     /// </summary>
     public class InterviewerDriver : MonoBehaviour
     {
         [Header("참조")]
-        public BackendControlClient backend;   // BackendControlClient 컴포넌트
-        public Animator animator;              // 면접관 Animator (Expression_ID / Gesture_ID 파라미터 보유)
-        public Speaker speaker;          // 팀의 Speaker.cs (OnAudioChunk 를 넘겨줄 대상)
+        public BackendControlClient backend;
+        public Animator animator;
+        public Speaker speaker;
+        public InterviewerExpression expression;
+
         [Header("면접 설정")]
         public string company = "네이버";
         public string jobTitle = "백엔드 개발자";
         [TextArea] public string resume = "Spring/Java 3년, MSA 경험";
 
-        // Animator 파라미터 이름 (uLipSync 와 별개로 표정/제스처 제어)
-        private static readonly int ExpressionId = Animator.StringToHash("Expression_ID");
-        private static readonly int GestureId = Animator.StringToHash("Gesture_ID");
+        [Header("블렌드 반응 속도")]
+        [SerializeField] float emotionLerp = 6f;
+        [SerializeField] float speakingLerp = 10f;
+
+        private static readonly int EmotionHash = Animator.StringToHash("Emotion");
+        private static readonly int SpeakingHash = Animator.StringToHash("Speaking");
+
+        private float _targetEmotion = 0f;   // -1(부정) ~ +1(긍정)
+        private float _targetSpeaking = 0f;   //  0(경청) ~  1(말하기)
 
         private void OnEnable()
         {
@@ -40,27 +49,42 @@ namespace VRoom.Backend
 
         private void Start()
         {
+            if (InterviewConfig.IsReady)
+            {
+                company = InterviewConfig.Company;
+                jobTitle = InterviewConfig.JobTitle;
+                resume = InterviewConfig.Resume;
+            }
             backend.StartInterview(company, jobTitle, resume);
         }
 
-        // 행동 패킷 -> 표정/제스처 즉시 트리거 (음성보다 먼저 도착하므로 반응이 자연스럽다)
         void HandlePacket(BehaviorPacket p)
         {
             Debug.Log($"[면접관/{p.stage}/{p.persona}] {p.dialogue} " +
                       $"(점수 {p.score}, expr={p.expression_id}, gesture={p.gesture_id})");
+
+            _targetEmotion = p.persona switch
+            {
+                "POSITIVE" => 1f,
+                "NEGATIVE" => -1f,
+                _ => 0f,
+            };
+            expression?.Apply(p.expression_id);
+
             if (p.is_final) _ = backend.RequestFeedback();
         }
 
-        // PCM 음성 청크 -> Speaker.cs 로 전달. (팀 Speaker 의 실제 메서드명에 맞춰 수정)
         private void HandleAudio(byte[] pcm)
         {
-            if(speaker != null)
+            _targetSpeaking = 1f;
+            if (speaker != null)
                 speaker.HandleAudioChunkReceived(pcm);
         }
 
         private void HandleAudioEnd()
         {
-            if(speaker != null)
+            _targetSpeaking = 0f;
+            if (speaker != null)
                 speaker.SetEndOfStream();
         }
 
@@ -69,6 +93,16 @@ namespace VRoom.Backend
             Debug.Log($"[피드백] 종합 {r.overall_score}점 / 평균발화 {r.avg_speaking_time}s");
             Debug.Log($"강점: {r.strengths}\n개선: {r.improvements}\n총평: {r.summary}");
             // 여기서 3D Spatial UI 에 결과를 시각화한다.
+        }
+
+        private void Update()
+        {
+            if (animator == null) return;
+
+            animator.SetFloat(EmotionHash,
+                Mathf.Lerp(animator.GetFloat(EmotionHash), _targetEmotion, Time.deltaTime * emotionLerp));
+            animator.SetFloat(SpeakingHash,
+                Mathf.Lerp(animator.GetFloat(SpeakingHash), _targetSpeaking, Time.deltaTime * speakingLerp));
         }
     }
 }
