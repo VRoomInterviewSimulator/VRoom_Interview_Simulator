@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "com.hecomi.ulipsync": "https://github.com/hecomi/uLipSync.git?path=Assets/uLipSync",
     "com.meta.xr.sdk.all": "201.0.0",
     "com.unity.animation.rigging": "1.4.1",
     "com.unity.collab-proxy": "2.12.4",

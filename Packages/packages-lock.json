@@ -1,5 +1,15 @@
 {
   "dependencies": {
+    "com.hecomi.ulipsync": {
+      "version": "https://github.com/hecomi/uLipSync.git?path=Assets/uLipSync",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {
+        "com.unity.burst": "1.4.11",
+        "com.unity.mathematics": "1.2.5"
+      },
+      "hash": "060587907655235dba86dc7052d0b395c8ecd840"
+    },
     "com.meta.xr.mrutilitykit": {
       "version": "201.0.0",
       "depth": 1,

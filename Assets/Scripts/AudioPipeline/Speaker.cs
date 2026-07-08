@@ -11,8 +11,10 @@ namespace VerbalProcess
         [SerializeField] private int serverSampleRate = 44100;
         [SerializeField] private float volume = 1.0f;
         [SerializeField] private int bufferThresholdChunks = 3; // 큐에 쌓일 청크 개수 기준
-
         public Action OnPlaybackFinished; // 모든 버퍼 재생이 완료되었을 때 발생
+
+        [Header("LipSync")]
+        [SerializeField] private uLipSync.uLipSync lipSync; // 면접관 캐릭터의 uLipSync 참조
 
         private AudioSource _audioSource;
 
@@ -321,6 +323,11 @@ namespace VerbalProcess
                 {
                     data[i + c] = interpolatedSample * volume;
                 }
+            }
+
+            if (lipSync != null)
+            {
+                lipSync.OnDataReceived(data, channels);
             }
         }
     }
