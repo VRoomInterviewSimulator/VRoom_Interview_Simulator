@@ -3844,6 +3844,7 @@ GameObject:
   - component: {fileID: 1355935767}
   - component: {fileID: 1355935766}
   - component: {fileID: 1355935765}
+  - component: {fileID: 1355935769}
   m_Layer: 0
   m_Name: CalibRig
   m_TagString: Untagged
@@ -3879,7 +3880,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 87560e04aa74c7a41acb9c87051c3b02, type: 3}
   m_Name: 
   m_EditorClassIdentifier: uLipSync.Runtime::uLipSync.uLipSync
-  profile: {fileID: 11400000, guid: cb27af03538d5e847b9d4463ba0dea57, type: 2}
+  profile: {fileID: 11400000, guid: d97f56e23427d5f428cfb286b3a9db70, type: 2}
   onLipSyncUpdate:
     m_PersistentCalls:
       m_Calls: []
@@ -3896,7 +3897,7 @@ AudioSource:
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 0}
-  m_Resource: {fileID: 8300000, guid: 032d68c09649fce4a8d4c88a4ae20dd9, type: 3}
+  m_Resource: {fileID: 0}
   m_PlayOnAwake: 1
   m_Volume: 1
   m_Pitch: 1
@@ -3997,6 +3998,22 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1355935769
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1355935764}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f24f90331c09e854586fe2cd12e69544, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: uLipSync.Runtime::uLipSync.uLipSyncMicrophone
+  index: 0
+  isAutoStart: 1
+  latencyTolerance: 0.05
+  bufferTime: 0.03
 --- !u!1 &1362508802
 GameObject:
   m_ObjectHideFlags: 0
@@ -4189,7 +4206,6 @@ GameObject:
   - component: {fileID: 1372484130}
   - component: {fileID: 1372484131}
   - component: {fileID: 1372484132}
-  - component: {fileID: 1372484133}
   m_Layer: 0
   m_Name: uLipSync
   m_TagString: Untagged
@@ -4224,23 +4240,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 87560e04aa74c7a41acb9c87051c3b02, type: 3}
   m_Name: 
   m_EditorClassIdentifier: uLipSync.Runtime::uLipSync.uLipSync
-  profile: {fileID: 11400000, guid: cb27af03538d5e847b9d4463ba0dea57, type: 2}
+  profile: {fileID: 11400000, guid: d97f56e23427d5f428cfb286b3a9db70, type: 2}
   onLipSyncUpdate:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 1372484132}
-        m_TargetAssemblyTypeName: uLipSync.uLipSyncBlendShape, uLipSync.Runtime
-        m_MethodName: OnLipSyncUpdate
-        m_Mode: 0
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
-      - m_Target: {fileID: 1372484133}
         m_TargetAssemblyTypeName: uLipSync.uLipSyncBlendShape, uLipSync.Runtime
         m_MethodName: OnLipSyncUpdate
         m_Mode: 0
@@ -4270,46 +4274,23 @@ MonoBehaviour:
   skinnedMeshRenderer: {fileID: 1535098250}
   blendShapes:
   - phoneme: A
-    index: 0
-    maxWeight: 1
+    index: 6
+    maxWeight: 0.6
+  - phoneme: E
+    index: 7
+    maxWeight: 0.7
   - phoneme: I
     index: 5
     maxWeight: 0.9
   - phoneme: U
     index: 4
     maxWeight: 0.85
-  - phoneme: E
-    index: 7
-    maxWeight: 0.85
   - phoneme: O
     index: 3
     maxWeight: 0.9
-  maxBlendShapeValue: 100
-  minVolume: -2.5
-  maxVolume: -1.5
-  smoothness: 0.05
-  usePhonemeBlend: 1
---- !u!114 &1372484133
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1372484129}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2163de355e8fd8e4b83b631e07455323, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: uLipSync.Runtime::uLipSync.uLipSyncBlendShape
-  updateMethod: 0
-  skinnedMeshRenderer: {fileID: 1951732702}
-  blendShapes:
-  - phoneme: A
-    index: 0
-    maxWeight: 1
-  maxBlendShapeValue: 70
-  minVolume: -2.5
-  maxVolume: -1.5
+  maxBlendShapeValue: 170
+  minVolume: -2.4999998
+  maxVolume: -1.9081631
   smoothness: 0.05
   usePhonemeBlend: 1
 --- !u!1 &1388669882 stripped
@@ -4476,6 +4457,34 @@ PrefabInstance:
       value: Interviewer
       objectReference: {fileID: 0}
     - target: {fileID: 5197118176682910397, guid: 5c64c77415792304788366a8e64104c1, type: 3}
+      propertyPath: 'm_BlendShapeWeights.Array.data[0]'
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5197118176682910397, guid: 5c64c77415792304788366a8e64104c1, type: 3}
+      propertyPath: 'm_BlendShapeWeights.Array.data[1]'
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5197118176682910397, guid: 5c64c77415792304788366a8e64104c1, type: 3}
+      propertyPath: 'm_BlendShapeWeights.Array.data[2]'
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5197118176682910397, guid: 5c64c77415792304788366a8e64104c1, type: 3}
+      propertyPath: 'm_BlendShapeWeights.Array.data[3]'
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5197118176682910397, guid: 5c64c77415792304788366a8e64104c1, type: 3}
+      propertyPath: 'm_BlendShapeWeights.Array.data[4]'
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5197118176682910397, guid: 5c64c77415792304788366a8e64104c1, type: 3}
+      propertyPath: 'm_BlendShapeWeights.Array.data[5]'
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5197118176682910397, guid: 5c64c77415792304788366a8e64104c1, type: 3}
+      propertyPath: 'm_BlendShapeWeights.Array.data[6]'
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5197118176682910397, guid: 5c64c77415792304788366a8e64104c1, type: 3}
       propertyPath: 'm_BlendShapeWeights.Array.data[7]'
       value: 0
       objectReference: {fileID: 0}
@@ -4552,7 +4561,23 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5197118176682910397, guid: 5c64c77415792304788366a8e64104c1, type: 3}
+      propertyPath: 'm_BlendShapeWeights.Array.data[86]'
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5197118176682910397, guid: 5c64c77415792304788366a8e64104c1, type: 3}
       propertyPath: 'm_BlendShapeWeights.Array.data[108]'
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5197118176682910397, guid: 5c64c77415792304788366a8e64104c1, type: 3}
+      propertyPath: 'm_BlendShapeWeights.Array.data[110]'
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5197118176682910397, guid: 5c64c77415792304788366a8e64104c1, type: 3}
+      propertyPath: 'm_BlendShapeWeights.Array.data[127]'
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5197118176682910397, guid: 5c64c77415792304788366a8e64104c1, type: 3}
+      propertyPath: 'm_BlendShapeWeights.Array.data[128]'
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5197118176682910397, guid: 5c64c77415792304788366a8e64104c1, type: 3}
@@ -4589,6 +4614,18 @@ PrefabInstance:
       objectReference: {fileID: 9100000, guid: fec2ec9ef4a42384bae3286250a5f242, type: 2}
     - target: {fileID: 5866666021909216657, guid: 5c64c77415792304788366a8e64104c1, type: 3}
       propertyPath: m_ApplyRootMotion
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7634479467738841525, guid: 5c64c77415792304788366a8e64104c1, type: 3}
+      propertyPath: 'm_BlendShapeWeights.Array.data[0]'
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8304175215116285622, guid: 5c64c77415792304788366a8e64104c1, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8443775884153234311, guid: 5c64c77415792304788366a8e64104c1, type: 3}
+      propertyPath: 'm_BlendShapeWeights.Array.data[0]'
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
@@ -6275,7 +6312,7 @@ MonoBehaviour:
   m_HandleRect: {fileID: 803496433}
   m_Direction: 2
   m_Value: 1
-  m_Size: 0.9999962
+  m_Size: 1
   m_NumberOfSteps: 0
   m_OnValueChanged:
     m_PersistentCalls:
@@ -7089,7 +7126,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -591.49884, y: 191.49878}
+  m_AnchoredPosition: {x: -591.4992, y: 191.49927}
   m_SizeDelta: {x: 1200, y: 100}
   m_Pivot: {x: 0, y: 1}
 --- !u!114 &1951308403
@@ -7109,11 +7146,6 @@ MonoBehaviour:
   leftPadding: 0
   rightPadding: 0
   verticalPadding: 0
---- !u!137 &1951732702 stripped
-SkinnedMeshRenderer:
-  m_CorrespondingSourceObject: {fileID: 7634479467738841525, guid: 5c64c77415792304788366a8e64104c1, type: 3}
-  m_PrefabInstance: {fileID: 1535098245}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1956817509
 GameObject:
   m_ObjectHideFlags: 0
@@ -7692,8 +7724,8 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1755399022}
   m_HandleRect: {fileID: 1755399021}
   m_Direction: 0
-  m_Value: -0.00006821625
-  m_Size: 0.9858322
+  m_Value: -0.000050264607
+  m_Size: 0.9858334
   m_NumberOfSteps: 0
   m_OnValueChanged:
     m_PersistentCalls:
