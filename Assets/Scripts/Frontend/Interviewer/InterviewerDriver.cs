@@ -15,11 +15,12 @@ namespace VRoom.Backend
         public Animator animator;
         public Speaker speaker;
         public InterviewerExpression expression;
+        public ResultUI resultUI;
 
         [Header("면접 설정")]
-        public string company = "네이버";
-        public string jobTitle = "백엔드 개발자";
-        [TextArea] public string resume = "Spring/Java 3년, MSA 경험";
+        public string company = "";
+        public string jobTitle = "";
+        [TextArea] public string resume = "";
 
         [Header("블렌드 반응 속도")]
         [SerializeField] float emotionLerp = 6f;
@@ -90,9 +91,10 @@ namespace VRoom.Backend
 
         private void HandleFeedback(FeedbackReport r)
         {
-            Debug.Log($"[피드백] 종합 {r.overall_score}점 / 평균발화 {r.avg_speaking_time}s");
-            Debug.Log($"강점: {r.strengths}\n개선: {r.improvements}\n총평: {r.summary}");
-            // 여기서 3D Spatial UI 에 결과를 시각화한다.
+            if (resultUI != null) 
+                resultUI.Show(r);
+            else 
+                Debug.LogWarning("[InterviewerDriver] resultUI 미연결");
         }
 
         private void Update()
