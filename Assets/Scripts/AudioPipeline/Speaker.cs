@@ -85,6 +85,12 @@ namespace VerbalProcess
             {
                 _playbackFinishedEventFired = true;
                 _isEndOfStream = false;
+
+                // 재생이 실제로 끝났다면, 추정치가 얼마나 부정확했든 상관없이
+                // 남은 자막을 전부 노출시킨 뒤에 지운다.
+                System.Threading.Volatile.Write(ref _currentSubtitleProgress, 1.0f);
+                UpdateSubtitlePacing(); // 이번 프레임에 즉시 반영해서 마지막 단어까지 확실히 표시
+
                 OnPlaybackFinished?.Invoke();
                 Debug.Log("[Speaker] All audio playback finished. VAD can be re-enabled.");
             }
@@ -290,12 +296,9 @@ namespace VerbalProcess
                         }
                         else
                         {
-                            // 버퍼 언더런 (데이터 부족) 또는 문장 재생 완료
-                            _currentChunk = null; // 현재 청크 완료 표시
+                            // 버퍼 언더런: 재생만 일시 정지
+                            _currentChunk = null;
                             _hasCurrentSample = false;
-                            _activeSubtitleText = null; // 오디오 스레드 전용 상태 해제
-                            System.Threading.Volatile.Write(ref _currentSubtitleText, "");
-                            System.Threading.Volatile.Write(ref _currentSubtitleProgress, 0.0f);
                             break;
                         }
                     }
