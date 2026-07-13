@@ -22,6 +22,7 @@ namespace VerbalProcess
         {
             public string subtitleText;
             public float[] audioData;
+            public int estimatedTotalSamples;
         }
 
         public Action<string> OnSubtitleTextChanged; // 자막 변경 시 발생
@@ -42,9 +43,16 @@ namespace VerbalProcess
         private bool _isEndOfStream = false;
         private bool _playbackFinishedEventFired = true; // 시작 시에는 완료된 상태로 간주
 
+        [SerializeField] private float secondsPerChar = 0.18f;
         private string _pendingSubtitleText = "";
+        private int _pendingEstimatedTotalSamples = 0;
         private string _currentSubtitleText = "";
         private float _currentSubtitleProgress = 0.0f;
+
+        // 오디오 스레드 전용 상태 변수 (메인 스레드 접근 금지)
+        private string _activeSubtitleText = null;
+        private int _turnCumulativeSamples = 0;
+        private int _turnEstimatedTotalSamples = 0;
 
         // GC 할당 최적화용 캐시 변수들
         private string _lastSubtitleText = null;
@@ -159,6 +167,7 @@ namespace VerbalProcess
         public void HandleSubtitleReceived(string subtitleText)
         {
             _pendingSubtitleText = subtitleText;
+            _pendingEstimatedTotalSamples = Mathf.RoundToInt(subtitleText.Length * secondsPerChar * serverSampleRate);
         }
 
         public void HandleAudioChunkReceived(byte[] pcmData)
@@ -195,9 +204,10 @@ namespace VerbalProcess
             SubtitleChunk chunk = new SubtitleChunk
             {
                 subtitleText = _pendingSubtitleText,
-                audioData = floatArray
+                audioData = floatArray,
+                estimatedTotalSamples = _pendingEstimatedTotalSamples
             };
-            _pendingSubtitleText = ""; // 큐에 매핑한 후 임시 변수 비우기
+            // _pendingSubtitleText는 덮어씌워질 때까지 비우지 않고 누적 유지
 
             _audioChunkQueue.Enqueue(chunk);
             _playbackFinishedEventFired = false;
@@ -234,8 +244,9 @@ namespace VerbalProcess
             _isEndOfStream = false;
             _playbackFinishedEventFired = true;
 
-            // 자막 관련 변수 초기화
+            // 자막 관련 변수 초기화 (메인 스레드 소유 변수만 해제)
             _pendingSubtitleText = "";
+            _pendingEstimatedTotalSamples = 0;
             System.Threading.Volatile.Write(ref _currentSubtitleText, "");
             System.Threading.Volatile.Write(ref _currentSubtitleProgress, 0.0f);
             
@@ -266,13 +277,23 @@ namespace VerbalProcess
                         {
                             _currentChunk = chunk.audioData;
                             _chunkIndex = 0;
-                            System.Threading.Volatile.Write(ref _currentSubtitleText, chunk.subtitleText);
+
+                            // 새 문장 경계 감지
+                            if (chunk.subtitleText != _activeSubtitleText)
+                            {
+                                _activeSubtitleText = chunk.subtitleText;
+                                _turnCumulativeSamples = 0;
+                                _turnEstimatedTotalSamples = chunk.estimatedTotalSamples;
+                            }
+
+                            System.Threading.Volatile.Write(ref _currentSubtitleText, _activeSubtitleText);
                         }
                         else
                         {
-                            // 버퍼 언더런 (데이터 부족)
+                            // 버퍼 언더런 (데이터 부족) 또는 문장 재생 완료
                             _currentChunk = null; // 현재 청크 완료 표시
                             _hasCurrentSample = false;
+                            _activeSubtitleText = null; // 오디오 스레드 전용 상태 해제
                             System.Threading.Volatile.Write(ref _currentSubtitleText, "");
                             System.Threading.Volatile.Write(ref _currentSubtitleProgress, 0.0f);
                             break;
@@ -280,11 +301,13 @@ namespace VerbalProcess
                     }
 
                     float nextSample = _currentChunk[_chunkIndex++];
+                    _turnCumulativeSamples++;
 
-                    // 진행률 업데이트
+                    // 진행률 업데이트 (문장 전체의 누적 샘플 수 기반)
                     if (_currentChunk != null)
                     {
-                        float progress = (float)_chunkIndex / _currentChunk.Length;
+                        int denom = Mathf.Max(_turnEstimatedTotalSamples, _turnCumulativeSamples);
+                        float progress = denom > 0 ? (float)_turnCumulativeSamples / denom : 0f;
                         System.Threading.Volatile.Write(ref _currentSubtitleProgress, progress);
                     }
 
