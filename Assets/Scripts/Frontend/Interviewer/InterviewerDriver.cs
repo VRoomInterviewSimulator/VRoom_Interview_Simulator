@@ -62,17 +62,13 @@ namespace VRoom.Backend
         void HandlePacket(BehaviorPacket p)
         {
             Debug.Log($"[면접관/{p.stage}/{p.persona}] {p.dialogue} " +
-                      $"(점수 {p.score}, expr={p.expression_id}, gesture={p.gesture_id})");
+                      $"(점수 {p.score}, emo={p.persona_value:F2}, expr={p.expression_id})");
 
-            _targetEmotion = p.persona switch
-            {
-                "POSITIVE" => 1f,
-                "NEGATIVE" => -1f,
-                _ => 0f,
-            };
+            _targetEmotion = p.persona_value;
             expression?.Apply(p.expression_id);
 
-            if (p.is_final) _ = backend.RequestFeedback();
+            if (p.is_final) 
+                _ = backend.RequestFeedback();
         }
 
         private void HandleAudio(byte[] pcm)

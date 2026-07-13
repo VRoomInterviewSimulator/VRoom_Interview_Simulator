@@ -15,6 +15,7 @@ namespace VRoom.Backend
         public string session_id;
         public string stage;         // SELF_INTRO / TECH_Q1 / ... / DONE
         public string persona;       // POSITIVE / NEUTRAL / NEGATIVE
+        public float persona_value;  //  연속 감정 강도(-1.0 ~ +1.0)
         public string dialogue;      // 면접관 대사 (자막용)
         public int expression_id;    // Animator 의 Expression_ID 파라미터로 전달
         public int gesture_id;       // Animator 의 Gesture_ID 파라미터로 전달
