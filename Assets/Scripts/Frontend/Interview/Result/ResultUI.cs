@@ -31,7 +31,6 @@ namespace VRoom.Backend
             "답변 목소리 빠르기", "답변 길이", "답변 내 필러 단어 여부", "답변의 정확도", "답변 반응 속도"
         };
 
-        private readonly List<GameObject> _cells = new List<GameObject>();
 
         void Awake()
         {
@@ -74,8 +73,6 @@ namespace VRoom.Backend
                 var cell = go.GetComponent<ScoreCellView>();
                 if (cell) 
                     cell.Set(i + 1, Labels[i], values[i], 10);
-
-                _cells.Add(go);
             }
 
             if (totalText) 
@@ -110,10 +107,20 @@ namespace VRoom.Backend
 
         private void ClearCells()
         {
-            foreach (var g in _cells) 
-                Destroy(g);
+            ClearChildren(leftColumn);
+            ClearChildren(rightColumn);
+        }
 
-            _cells.Clear();
+        private static void ClearChildren(Transform parent)
+        {
+            if (parent == null) return;
+
+            for (int i = parent.childCount - 1; i >= 0; i--)
+            {
+                var child = parent.GetChild(i).gameObject;
+                if (Application.isPlaying) Destroy(child);
+                else DestroyImmediate(child);   // 편집 모드: 즉시 삭제
+            }
         }
 
         [ContextMenu("Show Sample")]
