@@ -165,6 +165,7 @@ GameObject:
   m_Component:
   - component: {fileID: 223723292}
   - component: {fileID: 223723291}
+  - component: {fileID: 223723293}
   m_Layer: 0
   m_Name: Directional Light
   m_TagString: Untagged
@@ -252,6 +253,35 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 50, y: -30, z: 0}
+--- !u!114 &223723293
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 223723290}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalLightData
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_CustomShadowLayers: 0
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
+  m_RenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_ShadowRenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_Version: 4
+  m_LightLayerMask: 1
+  m_ShadowLayerMask: 1
+  m_RenderingLayers: 1
+  m_ShadowRenderingLayers: 1
 --- !u!1 &357752915
 GameObject:
   m_ObjectHideFlags: 0
@@ -1998,6 +2028,7 @@ GameObject:
   - component: {fileID: 1025440514}
   - component: {fileID: 1025440516}
   - component: {fileID: 1025440515}
+  - component: {fileID: 1025440517}
   m_Layer: 5
   m_Name: Warning Text
   m_TagString: Untagged
@@ -2075,10 +2106,10 @@ MonoBehaviour:
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 0
-  m_fontSizeMin: 18
-  m_fontSizeMax: 72
+  m_fontSizeMin: 12
+  m_fontSizeMax: 36
   m_fontStyle: 0
-  m_HorizontalAlignment: 1
+  m_HorizontalAlignment: 2
   m_VerticalAlignment: 256
   m_textAlignment: 65535
   m_characterSpacing: 0
@@ -2124,6 +2155,26 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1025440513}
   m_CullTransparentMesh: 1
+--- !u!114 &1025440517
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1025440513}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 306cc8c2b49d7114eaa3623786fc2126, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.LayoutElement
+  m_IgnoreLayout: 0
+  m_MinWidth: -1
+  m_MinHeight: 90
+  m_PreferredWidth: -1
+  m_PreferredHeight: -1
+  m_FlexibleWidth: -1
+  m_FlexibleHeight: -1
+  m_LayoutPriority: 1
 --- !u!1 &1150484171
 GameObject:
   m_ObjectHideFlags: 0
@@ -2297,6 +2348,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1458298043}
   - component: {fileID: 1458298042}
+  - component: {fileID: 1458298044}
   m_Layer: 0
   m_Name: SetupManager
   m_TagString: Untagged
@@ -2323,6 +2375,7 @@ MonoBehaviour:
   interviewSceneName: InterviewRoomScene
   startButton: {fileID: 927651993}
   warningText: {fileID: 1025440515}
+  warmup: {fileID: 1458298044}
 --- !u!4 &1458298043
 Transform:
   m_ObjectHideFlags: 0
@@ -2338,6 +2391,22 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1458298044
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1458298041}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d487e86fe746d3c4e80c11711f8dc39e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VRoom.Backend.BackendWarmup
+  backendHttp: http://127.0.0.1:8080
+  sessionId: default
+  healthTimeout: 5
+  prepareTimeout: 90
 --- !u!1 &1655198320
 GameObject:
   m_ObjectHideFlags: 0

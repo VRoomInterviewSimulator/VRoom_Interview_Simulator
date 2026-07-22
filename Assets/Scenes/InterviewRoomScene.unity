@@ -16800,6 +16800,7 @@ GameObject:
   - component: {fileID: 1687659430}
   - component: {fileID: 1687659432}
   - component: {fileID: 1687659431}
+  - component: {fileID: 1687659433}
   m_Layer: 0
   m_Name: TV Text
   m_TagString: Untagged
@@ -16873,11 +16874,11 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 30
+  m_fontSize: 31.25
   m_fontSizeBase: 30
   m_fontWeight: 400
-  m_enableAutoSizing: 0
-  m_fontSizeMin: 18
+  m_enableAutoSizing: 1
+  m_fontSizeMin: 8
   m_fontSizeMax: 72
   m_fontStyle: 0
   m_HorizontalAlignment: 2
@@ -16890,7 +16891,7 @@ MonoBehaviour:
   m_lineSpacingMax: 0
   m_paragraphSpacing: 0
   m_charWidthMaxAdj: 0
-  m_TextWrappingMode: 1
+  m_TextWrappingMode: 0
   m_wordWrappingRatios: 0.4
   m_overflowMode: 0
   m_linkedTextComponent: {fileID: 0}
@@ -16970,6 +16971,25 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &1687659433
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1687659429}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b0e748bb46baa614fa544bead89f2627, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VRoom.Backend.CompanyLabel
+  target: {fileID: 1687659431}
+  format: "{0} {1} \uC2E0\uC785 \uACF5\uCC44 \uBA74\uC811"
+  fallbackCompany: "XX \uD68C\uC0AC"
+  fallbackJob: "\uC9C0\uC6D0"
+  enforceSingleLineAutoFit: 1
+  fontSizeMin: 8
+  fontSizeMax: 72
 --- !u!1 &1688939781
 GameObject:
   m_ObjectHideFlags: 0
@@ -19062,7 +19082,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 803496434}
   m_HandleRect: {fileID: 803496433}
   m_Direction: 2
-  m_Value: 1
+  m_Value: 0
   m_Size: 1
   m_NumberOfSteps: 0
   m_OnValueChanged:
@@ -19844,7 +19864,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -591.4997, y: 191.49979}
+  m_AnchoredPosition: {x: -591.5, y: 191.5}
   m_SizeDelta: {x: 1200, y: 100}
   m_Pivot: {x: 0, y: 1}
 --- !u!114 &1951308403
@@ -21573,7 +21593,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1755399022}
   m_HandleRect: {fileID: 1755399021}
   m_Direction: 0
-  m_Value: -0.000017951517
+  m_Value: 0
   m_Size: 0.98583335
   m_NumberOfSteps: 0
   m_OnValueChanged:

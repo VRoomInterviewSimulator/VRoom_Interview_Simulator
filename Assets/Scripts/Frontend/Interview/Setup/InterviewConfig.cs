@@ -11,5 +11,27 @@ namespace VRoom.Backend
         public static string JobTitle = "";
         public static string Resume = "";
         public static bool IsReady = false;
+        public static string SessionId = "default";
+        public static bool Prewarmed = false;
+
+        public static string CompanyShort
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(Company)) return "";
+                var lines = Company.Trim().Split('\n');
+                return lines[0].Trim();
+            }
+        }
+
+        public static string JobTitleShort
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(JobTitle)) return "";
+                var lines = JobTitle.Trim().Split('\n');
+                return lines[0].Trim();
+            }
+        }
     }
 }

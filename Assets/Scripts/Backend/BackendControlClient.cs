@@ -43,6 +43,9 @@ namespace VRoom.Backend
         /// <summary> 면접 시작: 연결 후 init 메시지를 보낸다. </summary>
         public async void StartInterview(string company, string jobTitle, string resume)
         {
+            if (!string.IsNullOrEmpty(InterviewConfig.SessionId))
+                sessionId = InterviewConfig.SessionId;
+
             _cts = new CancellationTokenSource();
             _ws = new ClientWebSocket();
             await _ws.ConnectAsync(new Uri(backendUrl), _cts.Token);
@@ -53,8 +56,11 @@ namespace VRoom.Backend
                 $"\"session_id\":\"{Escape(sessionId)}\"," +
                 $"\"company\":\"{Escape(company)}\"," +
                 $"\"job_title\":\"{Escape(jobTitle)}\"," +
-                $"\"resume\":\"{Escape(resume)}\"}}";
+                $"\"resume\":\"{Escape(resume)}\"," +
+            $"\"prewarmed\":{(InterviewConfig.Prewarmed ? "true" : "false")}}}";
             await SendText(init);
+
+            Debug.Log($"[Backend] init 전송 (session={sessionId}, prewarmed={InterviewConfig.Prewarmed})");
         }
 
         /// <summary> 면접 종료 시 최종 피드백 리포트를 요청한다. </summary>

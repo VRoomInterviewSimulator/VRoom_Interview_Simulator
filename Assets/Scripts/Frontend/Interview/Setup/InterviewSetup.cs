@@ -25,19 +25,42 @@ namespace VRoom.Backend
         public Button startButton;
         public TMP_Text warningText;
 
+        [Header("백엔드 프리웜")]
+        public BackendWarmup warmup;
+
+
         private string _company = "";
         private string _job = "";
         private string _resume = "";
         private bool _loaded = false;
+        private bool _preparing = false;
+        private string _fileLine = "";
+        private string _statusLine = "";
 
         void Start()
         {
             loadFileButton.onClick.AddListener(OnLoadFile);
             startButton.onClick.AddListener(OnStart);
             startButton.interactable = false;
-            if (warningText != null) 
-                warningText.text = "먼저 면접 정보 txt 파일을 불러와주세요.";
+
+            _fileLine = "먼저 면접 정보 txt 파일을 불러와주세요.";
+            _statusLine = "";
+            Redraw();
             ClearPreview();
+            if (warmup != null)
+            {
+                warmup.OnProgress += OnWarmupProgress;
+                warmup.OnFinished += OnWarmupFinished;
+            }
+        }
+
+        void OnDestroy()
+        {
+            if (warmup != null)
+            {
+                warmup.OnProgress -= OnWarmupProgress;
+                warmup.OnFinished -= OnWarmupFinished;
+            }
         }
 
         void OnLoadFile()
@@ -63,11 +86,11 @@ namespace VRoom.Backend
                 startButton.interactable = false;
                 ClearPreview();
                 SetWarning(err);
+                _statusLine = "";
                 return;
             }
 
             _loaded = true;
-            startButton.interactable = true;
             if (companyPreview)
                 companyPreview.text = _company;
             if (jobPreview)
@@ -79,10 +102,31 @@ namespace VRoom.Backend
             }
 
             SetWarning($"불러오기 완료: {Path.GetFileName(path)}");
+
+            InterviewConfig.Company = _company;
+            InterviewConfig.JobTitle = _job;
+            InterviewConfig.Resume = _resume;
+            InterviewConfig.IsReady = true;
+            InterviewConfig.Prewarmed = false;
+            if (warmup != null)
+            {
+                _preparing = true;
+                startButton.interactable = false;
+                _statusLine = "";
+                warmup.Prepare(_company, _job, _resume);
+            }
+            else
+                startButton.interactable = true;     
         }
 
         void OnStart()
         {
+            if (_preparing)
+            {
+                SetWarning("면접관 준비 중입니다. 잠시만 기다려주세요.");
+                return;
+            }
+
             if (!_loaded || string.IsNullOrEmpty(_company) || string.IsNullOrEmpty(_job))
             {
                 SetWarning("기업과 직무가 채워진 파일을 먼저 불러오세요.");
@@ -159,8 +203,26 @@ namespace VRoom.Backend
 
         private void SetWarning(string msg)
         {
-            if (warningText != null) 
-                warningText.text = msg;
+            _fileLine = msg ?? "";
+            Redraw();
+        }
+
+        private void OnWarmupProgress(string msg)
+        {
+            _statusLine = msg ?? "";
+            Redraw();
+        }
+
+        private void Redraw()
+        {
+            if (warningText == null) return;
+
+            if (string.IsNullOrEmpty(_statusLine))
+                warningText.text = _fileLine;
+            else if (string.IsNullOrEmpty(_fileLine))
+                warningText.text = _statusLine;
+            else
+                warningText.text = $"{_fileLine}\n{_statusLine}";
         }
 
         private void ClearPreview()
@@ -171,6 +233,17 @@ namespace VRoom.Backend
                 jobPreview.text = "-";
             if (resumePreview) 
                 resumePreview.text = "-";
+        }
+
+        private void OnWarmupFinished(bool ok, string msg)
+        {
+            _preparing = false;
+            _statusLine = msg;
+            Redraw();
+
+            startButton.interactable = _loaded;
+            if (!ok)
+                Debug.LogWarning($"[InterviewSetup] 프리웜 실패: {msg}");
         }
     }
 }
