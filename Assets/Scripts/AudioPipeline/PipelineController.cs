@@ -23,6 +23,9 @@ namespace VerbalProcess
         private FeatureData _originalFeatures;
         private string _originalTextForCorrection = "";
 
+        private float _interviewerFinishedTime = -1f;
+        private float _currentResponseTime = 0f;
+
         private void OnEnable()
         {
             if (vad != null)
@@ -81,6 +84,11 @@ namespace VerbalProcess
 
         private void HandleSpeakingStarted()
         {
+            if (_interviewerFinishedTime > 0) {
+                _currentResponseTime = Time.time - _interviewerFinishedTime;
+                _interviewerFinishedTime = -1f;
+            }
+
             if (sttManager != null)
             {
                 // 새 발화가 시작될 때 STT 매니저의 상태(헤더 전송 여부)를 초기화
@@ -132,6 +140,7 @@ namespace VerbalProcess
             if (vad != null)
             {
                 vad.enabled = true;
+                _interviewerFinishedTime = Time.time;
                 Debug.Log("[Pipeline] Speaker finished. VAD re-enabled.");
             }
         }
@@ -165,6 +174,8 @@ namespace VerbalProcess
         private async void HandleUtteranceEnded(VoiceActivityDetector.VoiceFeatures features)
         {
             if (sttManager == null) return;
+            
+            features.responseTime = _currentResponseTime;
 
             try
             {
@@ -204,8 +215,11 @@ namespace VerbalProcess
                 _originalFeatures = new FeatureData(new VoiceActivityDetector.VoiceFeatures
                 {
                     speakingTime = msg.data.speakingTime,
-                    silenceCount = msg.data.pauseCount,
-                    averageVolume = msg.data.averageVolume
+                    meaningfulPauseCount = msg.data.pauseCount,
+                    averageVolume = msg.data.averageVolume,
+                    volumeVariance = 0f,
+                    lowVolumeRatio = 0f,
+                    responseTime = 0f
                 });
             }
 

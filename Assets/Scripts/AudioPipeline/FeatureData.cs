@@ -9,14 +9,20 @@ namespace VerbalProcess
     public class FeatureData
     {
         public float speakingTime;
-        public int pauseCount;
+        public int meaningfulPauseCount;
+        public float volumeVariance;
+        public float lowVolumeRatio;
         public float averageVolume;
+        public float responseTime;
 
         public FeatureData(VoiceActivityDetector.VoiceFeatures features)
         {
             this.speakingTime = features.speakingTime;
-            this.pauseCount = features.silenceCount;
+            this.meaningfulPauseCount = features.meaningfulPauseCount;
+            this.volumeVariance = features.volumeVariance;
+            this.lowVolumeRatio = features.lowVolumeRatio;
             this.averageVolume = features.averageVolume;
+            this.responseTime = features.responseTime;
         }
     }
 }
