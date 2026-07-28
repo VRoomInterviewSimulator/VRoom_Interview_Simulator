@@ -167,7 +167,7 @@ namespace VerbalProcess
             {
                 string json = $"{{\"type\":\"utterance_end\",\"session_id\":\"{EscapeJson(sessionId)}\",\"features\":{{" +
                             $"\"speakingTime\":{features.speakingTime:F2}," +
-                            $"\"pauseCount\":{features.pauseCount}," +
+                            $"\"pauseCount\":{features.meaningfulPauseCount}," +
                             $"\"averageVolume\":{features.averageVolume}}}}}";
 
                 byte[] bytes = Encoding.UTF8.GetBytes(json);
@@ -217,7 +217,7 @@ namespace VerbalProcess
                               $"\"original_words\":{wordsJson}," +
                               $"\"features\":{{" +
                               $"\"speakingTime\":{features.speakingTime:F2}," +
-                              $"\"pauseCount\":{features.pauseCount}," +
+                              $"\"pauseCount\":{features.meaningfulPauseCount}," +
                               $"\"averageVolume\":{features.averageVolume}}}}}";
 
                 byte[] bytes = Encoding.UTF8.GetBytes(json);
@@ -252,7 +252,7 @@ namespace VerbalProcess
                               $"\"text\":\"{text.Replace("\"", "\\\"")}\"," +
                               $"\"features\":{{" +
                               $"\"speakingTime\":{features.speakingTime:F2}," +
-                              $"\"pauseCount\":{features.pauseCount}," +
+                              $"\"pauseCount\":{features.meaningfulPauseCount}," +
                               $"\"averageVolume\":{features.averageVolume}}}}}";
 
                 byte[] bytes = Encoding.UTF8.GetBytes(json);

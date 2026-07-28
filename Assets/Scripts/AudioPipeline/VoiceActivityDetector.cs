@@ -24,6 +24,10 @@ namespace VerbalProcess
         public Action<AudioClip> OnAudioChunkCaptured; // 부분 음성 전달용 이벤트
         public Action OnSpeakingStarted;
 
+        [Header("Scoring Tolerances")]
+        public float meaningfulPauseThreshold = 0.4f;
+        public float lowVolumeRatioThreshold = 0.3f;
+
         private AudioClip micClip;
         private string micDevice;
         private bool isSpeaking = false;
@@ -32,7 +36,8 @@ namespace VerbalProcess
 
         private int lastChunkEndSample = 0; // 마지막으로 보낸 청크의 끝 지점
         private float utteranceStartTime;
-        private int silenceCount = 0;
+        private int meaningfulPauseCount = 0;
+        private bool wasMeaningfulSilence = false;
         private List<float> rmsSamples = new List<float>();
 
         private int lastSamplePosition = 0;
@@ -41,8 +46,11 @@ namespace VerbalProcess
         public struct VoiceFeatures
         {
             public float speakingTime;
-            public int silenceCount;
+            public int meaningfulPauseCount;
+            public float volumeVariance;
+            public float lowVolumeRatio;
             public float averageVolume;
+            public float responseTime;
         }
 
         void Start()
@@ -131,7 +139,11 @@ namespace VerbalProcess
                         chunkTimer = 0f;
                     }
                 }
-                silenceTimer = 0f;
+                if (silenceTimer > 0f)
+                {
+                    wasMeaningfulSilence = false;
+                    silenceTimer = 0f;
+                }
                 rmsSamples.Add(rms);
             }
             else if (isSpeaking)
@@ -139,13 +151,18 @@ namespace VerbalProcess
                 // 침묵이 시작되는 첫 프레임에서도 청크 전송 (남은 부분)
                 if (silenceTimer == 0f)
                 {
-                    silenceCount++;
                     SendChunk(currentPosition);
                     lastChunkEndSample = currentPosition;
                     chunkTimer = 0f;
                 }
 
                 silenceTimer += duration;
+                if (silenceTimer >= meaningfulPauseThreshold && !wasMeaningfulSilence)
+                {
+                    meaningfulPauseCount++;
+                    wasMeaningfulSilence = true;
+                }
+
                 if (silenceTimer >= silenceDurationThreshold)
                 {
                     EndSpeaking(currentPosition);
@@ -158,7 +175,8 @@ namespace VerbalProcess
             isSpeaking = true;
             utteranceStartTime = Time.time;
             lastChunkEndSample = currentPosition; // 청크 시작 지점 초기화
-            silenceCount = 0;
+            meaningfulPauseCount = 0;
+            wasMeaningfulSilence = false;
             rmsSamples.Clear();
             OnSpeakingStarted?.Invoke();
             Debug.Log("Speaking Started");
@@ -220,11 +238,30 @@ namespace VerbalProcess
             float duration = Time.time - utteranceStartTime - silenceDurationThreshold;
             float avgRms = rmsSamples.Count > 0 ? rmsSamples.Average() : 0f;
 
+            float volumeVariance = 0f;
+            float lowVolumeRatio = 0f;
+            if (rmsSamples.Count > 0)
+            {
+                float sumSq = 0f;
+                int lowCount = 0;
+                float lowThresh = avgRms * lowVolumeRatioThreshold;
+                foreach(var r in rmsSamples) {
+                    float diff = r - avgRms;
+                    sumSq += diff * diff;
+                    if (r < lowThresh) lowCount++;
+                }
+                volumeVariance = sumSq / rmsSamples.Count;
+                lowVolumeRatio = (float)lowCount / rmsSamples.Count;
+            }
+
             VoiceFeatures features = new VoiceFeatures
             {
                 speakingTime = Mathf.Max(0, duration),
-                silenceCount = silenceCount,
-                averageVolume = avgRms
+                meaningfulPauseCount = meaningfulPauseCount,
+                volumeVariance = volumeVariance,
+                lowVolumeRatio = lowVolumeRatio,
+                averageVolume = avgRms,
+                responseTime = 0f
             };
 
             // 유효한 마지막 잔여 조각이 있는 경우 서버 전송 이벤트 발생
