@@ -30,6 +30,8 @@ namespace VRoom.Multimodal
         [SerializeField] private string _currentStage = "";
         [SerializeField] private bool _calibrated;
 
+        private bool _turnStartPending;
+        private bool _calibrating;
         private bool _ready;
 
         private IEnumerator Start()
@@ -56,11 +58,19 @@ namespace VRoom.Multimodal
             };
             _ready = true;
 
-            if (calibrateOnStart) yield return Calibrate();
 
             if (vad != null) vad.OnUtteranceEnded += HandleUtteranceEnded;
             if (speaker != null) speaker.OnPlaybackFinished += HandlePlaybackFinished;
             if (backend != null) backend.OnBehaviorPacket += HandlePacket;
+
+            if (calibrateOnStart) 
+                yield return Calibrate();
+
+            if (_turnStartPending)
+            {
+                _turnStartPending = false;
+                BeginTurn();
+            }
         }
 
         private void OnDestroy()
@@ -73,18 +83,19 @@ namespace VRoom.Multimodal
         public IEnumerator Calibrate()
         {
             Debug.Log($"[Behavior] 캘리브레이션 {calibrationSeconds}초 — 정면을 응시하세요.");
+            _calibrating = true;
             yield return client.SendCalibrateStart();
             yield return new WaitForSeconds(calibrationSeconds);
             yield return client.SendCalibrateEnd();
+            _calibrating = false;
         }
 
         /// <summary> 면접관 발화 재생 완료 = 사용자 차례 시작. </summary>
         private void HandlePlaybackFinished()
         {
             if (!_ready || _inTurn) return;
-            _inTurn = true;
-            _ = client.SendTurnStart(_currentStage);
-            Debug.Log($"[Behavior] 턴 시작 (stage={_currentStage})");
+            if (_calibrating) { _turnStartPending = true; return; }
+            BeginTurn();
         }
 
         private void HandleUtteranceEnded(VoiceActivityDetector.VoiceFeatures features)
@@ -98,6 +109,13 @@ namespace VRoom.Multimodal
         private void HandlePacket(BehaviorPacket p)
         {
             if (!string.IsNullOrEmpty(p.stage)) _currentStage = p.stage;
+        }
+
+        private void BeginTurn()
+        {
+            _inTurn = true;
+            _ = client.SendTurnStart(_currentStage);
+            Debug.Log($"[Behavior] 턴 시작 (stage={_currentStage})");
         }
 
         // ---- 에디터 단독 검증용 ----
