@@ -7823,6 +7823,8 @@ MonoBehaviour:
   chunkSendInterval: 0.3
   sampleRate: 16000
   bufferLengthSeconds: 300
+  meaningfulPauseThreshold: 0.4
+  lowVolumeRatioThreshold: 0.3
 --- !u!114 &817680392
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7955,6 +7957,74 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 10, y: 0, z: 10}
   m_Center: {x: 0, y: -0.0000005, z: 0}
+--- !u!1 &828765546
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 828765549}
+  - component: {fileID: 828765548}
+  - component: {fileID: 828765550}
+  m_Layer: 0
+  m_Name: MultimodalRig
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &828765548
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 828765546}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 76e04f2b8d11e4742b1716b77832cbf0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VRoom.Multimodal.VisionStreamClient
+  wsUrl: ws://100.122.198.125:8002/ws/vision
+  sessionId: default
+--- !u!4 &828765549
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 828765546}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &828765550
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 828765546}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ae2facc101bbf2644a060b0c86714581, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VRoom.Multimodal.BehaviorCollector
+  client: {fileID: 828765548}
+  vad: {fileID: 817680391}
+  speaker: {fileID: 1535098248}
+  backend: {fileID: 2146786189}
+  calibrationSeconds: 3
+  calibrateOnStart: 1
+  _inTurn: 0
+  _currentStage: 
+  _calibrated: 0
 --- !u!1 &843333400
 GameObject:
   m_ObjectHideFlags: 0
@@ -19084,7 +19154,7 @@ MonoBehaviour:
   m_HandleRect: {fileID: 803496433}
   m_Direction: 2
   m_Value: 0
-  m_Size: 0.99994963
+  m_Size: 1
   m_NumberOfSteps: 0
   m_OnValueChanged:
     m_PersistentCalls:
@@ -19865,7 +19935,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -591.5, y: 191.49997}
+  m_AnchoredPosition: {x: -591.4999, y: 191.5}
   m_SizeDelta: {x: 1200, y: 100}
   m_Pivot: {x: 0, y: 1}
 --- !u!114 &1951308403
@@ -21594,8 +21664,8 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1755399022}
   m_HandleRect: {fileID: 1755399021}
   m_Direction: 0
-  m_Value: 0
-  m_Size: 0.98578364
+  m_Value: -0.0000071806066
+  m_Size: 0.98583335
   m_NumberOfSteps: 0
   m_OnValueChanged:
     m_PersistentCalls:
@@ -22214,3 +22284,4 @@ SceneRoots:
   - {fileID: 1304304716}
   - {fileID: 1355935768}
   - {fileID: 236281199}
+  - {fileID: 828765549}
