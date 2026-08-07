@@ -94,6 +94,7 @@ namespace VRoom.Multimodal
         private void HandlePlaybackFinished()
         {
             if (!_ready || _inTurn) return;
+            if (_currentStage == "DONE") return;
             if (_calibrating) { _turnStartPending = true; return; }
             BeginTurn();
         }

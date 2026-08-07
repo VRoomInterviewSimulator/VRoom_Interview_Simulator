@@ -25,6 +25,10 @@ namespace VerbalProcess
 
         private float _interviewerFinishedTime = -1f;
         private float _currentResponseTime = 0f;
+        
+        private bool _interviewFinished = false;
+        public void MarkInterviewFinished() => _interviewFinished = true;
+
 
         private void OnEnable()
         {

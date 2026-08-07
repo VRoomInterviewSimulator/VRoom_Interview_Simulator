@@ -16,6 +16,8 @@ namespace VRoom.Backend
         public Speaker speaker;
         public InterviewerExpression expression;
         public ResultUI resultUI;
+        public VoiceActivityDetector vad;
+        public STTManager stt;
 
         [Header("면접 설정")]
         public string company = "";
@@ -76,9 +78,11 @@ namespace VRoom.Backend
         void HandlePacket(BehaviorPacket p)
         {
             Debug.Log($"[면접관/{p.stage}/{p.persona}] {p.dialogue} " +
-                      $"(점수 {p.score}, emo={p.persona_value:F2}, expr={p.expression_id})");
+                       $"(점수 {p.score}, emo={p.persona_value:F2}, expr={p.expression_id})");
 
-            _targetEmotion = p.persona_value;
+            if (p.type != "thinking")
+                _targetEmotion = p.persona_value;
+
             expression?.Apply(p.expression_id);
 
             if (p.is_final && !_feedbackRequested)
@@ -131,12 +135,24 @@ namespace VRoom.Backend
             _feedbackPending = false;
             _feedbackDeadline = float.MaxValue;
 
+            if (vad != null)
+            {
+                vad.enabled = false;
+                Debug.Log("[면접관] 면접 종료 - VAD 비활성화");
+            }
+
             Debug.Log("[면접관] 마무리 멘트 재생 완료 - 피드백 요청");
             _ = backend.RequestFeedback();
         }
 
         private void HandleFeedback(FeedbackReport r)
         {
+            if (vad != null)
+            {
+                vad.enabled = false;
+                Debug.Log("[면접관] 면접 종료 - VAD 비활성화");
+            }
+
             if (resultUI != null)
                 resultUI.Show(r);
             else
