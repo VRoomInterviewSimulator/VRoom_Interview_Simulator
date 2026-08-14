@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
@@ -21,53 +22,70 @@ namespace VerbalProcess
             set => sessionId = value;
         }
 
-        public Action OnServerRequestEnd; // 서버에서 발화 종료를 감지했을 때 발생
         public Action<FinalResponse> OnTranscriptionReceived; // 최종 결과 수신
         public Action<byte[]> OnAudioChunkReceived; // 서버로부터 오디오 청크(Raw PCM) 수신 시 발생
         public Action OnAudioStreamEnded; // 서버에서 모든 오디오 스트리밍이 완료되었을 때 발생
         public Action<string> OnSubtitleReceived; // 서버로부터 자막 텍스트 수신 시 발생
         public Action<CorrectionRequestMessage> OnCorrectionRequested; // 저신뢰 교정 요청 수신 시 발생
+        public Action OnSentenceCompletedFlag; // 부분 전사에서 문장 종결이 감지되었을 때 발생
+        public Action OnSttSkipped;            // 빈 전사로 인해 STT 처리가 스킵되었을 때 발생
 
         private ClientWebSocket _webSocket;
         private CancellationTokenSource _cts;
+        private readonly CancellationTokenSource _lifetimeCts = new CancellationTokenSource();
         private bool _isFirstChunk = true;
-        private bool _isConnecting = false;
+        private int _reconnectScheduled = 0;
 
         private readonly SemaphoreSlim _connectLock = new SemaphoreSlim(1, 1); // 웹소켓 연결에 따른 세마포어
-        private readonly SemaphoreSlim _sendLock = new SemaphoreSlim(1, 1); // 데이터 전송에 따른 세마포어
+        private readonly SemaphoreSlim _sendSignal = new SemaphoreSlim(0); // 전송 큐 소비자 깨우기
+        private readonly object _utteranceStateLock = new object();
+        private readonly ConcurrentQueue<OutgoingPacket> _outgoingPackets = new ConcurrentQueue<OutgoingPacket>();
+        private Task _sendLoopTask;
 
         private async void Start()
         {
-            await ConnectAsync();
+            _sendLoopTask = SendLoopAsync();
+            try
+            {
+                await ConnectAsync();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[STT] Initial connection unavailable. Queued packets will retry after reconnect: {e.Message}");
+                _ = ScheduleReconnectAsync();
+            }
         }
 
         private void OnDestroy()
         {
+            _lifetimeCts.Cancel();
             _cts?.Cancel();
             _webSocket?.Dispose();
+            FailQueuedPackets(new OperationCanceledException("STTManager was destroyed."));
+            try { _sendSignal.Release(); } catch (SemaphoreFullException) { }
         }
 
         public async Task ConnectAsync()
         {
-            // 이미 연결 중이거나 연결된 경우 빠른 탈출
+            // 연결 중인 호출도 동일한 lock을 기다린 뒤 연결 결과를 공유합니다.
             if (_webSocket?.State == WebSocketState.Open) return;
-            if (_isConnecting) return;
 
-            await _connectLock.WaitAsync();
+            await _connectLock.WaitAsync(_lifetimeCts.Token);
+            ClientWebSocket socket = null;
+            CancellationTokenSource socketCts = null;
             try
             {
                 if (_webSocket?.State == WebSocketState.Open) return;
-                _isConnecting = true;
 
                 _cts?.Cancel();
                 _webSocket?.Dispose();
 
-                _webSocket = new ClientWebSocket();
-                _cts = new CancellationTokenSource();
+                socket = new ClientWebSocket();
+                socketCts = CancellationTokenSource.CreateLinkedTokenSource(_lifetimeCts.Token);
 
                 // 🌟 오디오 스트리밍 최적화: 버퍼 크기를 8KB로 조절하여 레이턴시 단축 및 네이글 알고리즘 완화
-                _webSocket.Options.SetBuffer(8192, 8192);
-                _webSocket.Options.KeepAliveInterval = TimeSpan.FromSeconds(10);
+                socket.Options.SetBuffer(8192, 8192);
+                socket.Options.KeepAliveInterval = TimeSpan.FromSeconds(10);
 
                 string urlWithSid = wsUrl;
                 if (!urlWithSid.Contains("session_id="))
@@ -76,32 +94,66 @@ namespace VerbalProcess
                     urlWithSid += $"{separator}session_id={Uri.EscapeDataString(sessionId)}";
                 }
 
-                await _webSocket.ConnectAsync(new Uri(urlWithSid), _cts.Token);
+                await socket.ConnectAsync(new Uri(urlWithSid), socketCts.Token);
+                if (_lifetimeCts.IsCancellationRequested)
+                {
+                    socket.Dispose();
+                    socketCts.Dispose();
+                    return;
+                }
+
+                _webSocket = socket;
+                _cts = socketCts;
                 Debug.Log($"[STT] WebSocket Connected to: {urlWithSid}");
-                _ = ReceiveLoop();
+                _ = ReceiveLoop(socket, socketCts);
             }
             catch (Exception e)
             {
-                Debug.LogError($"[STT] Connection Error: {e.Message}");
-                _ = ScheduleReconnectAsync();
+                if (socket != null && !ReferenceEquals(_webSocket, socket))
+                    socket.Dispose();
+                if (socketCts != null && !ReferenceEquals(_cts, socketCts))
+                    socketCts.Dispose();
+                if (!_lifetimeCts.IsCancellationRequested)
+                    Debug.LogError($"[STT] Connection Error: {e.Message}");
+                throw;
             }
             finally
             {
-                _isConnecting = false;
                 _connectLock.Release();
             }
         }
 
         private async Task ScheduleReconnectAsync()
         {
-            if (_cts == null || _cts.IsCancellationRequested) return;
-            
-            // 3초 대기 후 자동 재연결 시도
-            await Task.Delay(3000, _cts.Token);
-            if (_webSocket?.State != WebSocketState.Open)
+            if (_lifetimeCts.IsCancellationRequested ||
+                System.Threading.Interlocked.Exchange(ref _reconnectScheduled, 1) == 1)
+                return;
+
+            try
             {
-                Debug.Log("[STT] Attempting to reconnect to STT Worker...");
-                await ConnectAsync();
+                while (!_lifetimeCts.IsCancellationRequested && _webSocket?.State != WebSocketState.Open)
+                {
+                    await Task.Delay(3000, _lifetimeCts.Token);
+                    if (_webSocket?.State == WebSocketState.Open) break;
+
+                    try
+                    {
+                        Debug.Log("[STT] Attempting to reconnect to STT Worker...");
+                        await ConnectAsync();
+                    }
+                    catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
+                    {
+                        break;
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogWarning($"[STT] Reconnect failed: {e.Message}");
+                    }
+                }
+            }
+            finally
+            {
+                System.Threading.Interlocked.Exchange(ref _reconnectScheduled, 0);
             }
         }
 
@@ -110,22 +162,23 @@ namespace VerbalProcess
         /// </summary>
         public void ResetUtteranceState()
         {
-            _isFirstChunk = true;
+            lock (_utteranceStateLock)
+            {
+                _isFirstChunk = true;
+            }
         }
 
         /// <summary>
         /// 오디오 청크를 바이너리로 전송 (첫 청크만 헤더 포함)
         /// </summary>
-        public async Task SendAudioChunkAsync(AudioClip clip)
+        public Task SendAudioChunkAsync(AudioClip clip)
         {
-            if (_webSocket == null || _webSocket.State != WebSocketState.Open)
-                await ConnectAsync();
-            if (_webSocket?.State != WebSocketState.Open) return;
+            if (clip == null)
+                return Task.CompletedTask;
 
-            await _sendLock.WaitAsync();
-            try
+            byte[] audioBytes;
+            lock (_utteranceStateLock)
             {
-                byte[] audioBytes;
                 if (_isFirstChunk)
                 {
                     audioBytes = AudioUtils.GetWavBytes(clip);
@@ -135,19 +188,9 @@ namespace VerbalProcess
                 {
                     audioBytes = AudioUtils.GetRawPcmBytes(clip);
                 }
+            }
 
-                await _webSocket.SendAsync(
-                    new ArraySegment<byte>(audioBytes),
-                    WebSocketMessageType.Binary, true, _cts.Token);
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"[STT] Failed to send audio chunk: {e.Message}");
-            }
-            finally
-            {
-                _sendLock.Release();
-            }
+            return EnqueuePacket(audioBytes, WebSocketMessageType.Binary, "audio chunk");
         }
 
         private string EscapeJson(string s)
@@ -155,153 +198,175 @@ namespace VerbalProcess
             return (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r");
         }
 
+        private Task EnqueuePacket(byte[] payload, WebSocketMessageType messageType, string description, bool resetUtteranceStateAfterSend = false)
+        {
+            if (_lifetimeCts.IsCancellationRequested)
+                return Task.FromException(new OperationCanceledException("STTManager is shutting down."));
+
+            var packet = new OutgoingPacket(payload, messageType, description, resetUtteranceStateAfterSend);
+            _outgoingPackets.Enqueue(packet);
+            _sendSignal.Release();
+            return packet.Completion.Task;
+        }
+
+        private async Task SendLoopAsync()
+        {
+            try
+            {
+                while (!_lifetimeCts.IsCancellationRequested)
+                {
+                    await _sendSignal.WaitAsync(_lifetimeCts.Token);
+
+                    while (_outgoingPackets.TryDequeue(out var packet))
+                    {
+                        try
+                        {
+                            await SendPacketAsync(packet);
+                            packet.Completion.TrySetResult(true);
+                        }
+                        catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
+                        {
+                            packet.Completion.TrySetCanceled();
+                            FailQueuedPackets(new OperationCanceledException("STT send loop was cancelled."));
+                            return;
+                        }
+                        catch (Exception e)
+                        {
+                            Debug.LogWarning($"[STT] Failed to send {packet.Description}: {e.Message}");
+                            packet.Completion.TrySetException(e);
+
+                            // 현재 발화의 후속 패킷을 새 연결에 이어 보내면 오디오가 중간부터 시작될 수 있습니다.
+                            // 따라서 현재 큐를 비우고, 다음 발화부터 새 연결을 사용합니다.
+                            FailQueuedPackets(e);
+                            _cts?.Cancel();
+                            _webSocket?.Dispose();
+                            _ = ScheduleReconnectAsync();
+                            break;
+                        }
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
+            {
+                FailQueuedPackets(new OperationCanceledException("STT send loop was cancelled."));
+            }
+        }
+
+        private async Task SendPacketAsync(OutgoingPacket packet)
+        {
+            if (_webSocket == null || _webSocket.State != WebSocketState.Open)
+                await ConnectAsync();
+
+            var socket = _webSocket;
+            var socketCts = _cts;
+            if (socket == null || socket.State != WebSocketState.Open || socketCts == null)
+                throw new InvalidOperationException("STT WebSocket is not open.");
+
+            await socket.SendAsync(
+                new ArraySegment<byte>(packet.Payload),
+                packet.MessageType,
+                true,
+                socketCts.Token);
+
+            if (packet.ResetUtteranceStateAfterSend)
+            {
+                lock (_utteranceStateLock)
+                {
+                    _isFirstChunk = true;
+                }
+            }
+        }
+
+        private void FailQueuedPackets(Exception error)
+        {
+            while (_outgoingPackets.TryDequeue(out var queuedPacket))
+            {
+                queuedPacket.Completion.TrySetException(error);
+            }
+        }
+
         /// <summary>
         /// 발화 종료 신호와 Feature 데이터를 전송
         /// </summary>
-        public async Task SendEndUtteranceAsync(FeatureData features)
+        public Task SendEndUtteranceAsync(FeatureData features)
         {
-            if (_webSocket?.State != WebSocketState.Open) return;
-
-            await _sendLock.WaitAsync();
-            try
-            {
-                string json = $"{{\"type\":\"utterance_end\",\"session_id\":\"{EscapeJson(sessionId)}\",\"features\":{{" +
-                            $"\"speakingTime\":{features.speakingTime:F2}," +
-                            $"\"pauseCount\":{features.meaningfulPauseCount}," +
-                            $"\"averageVolume\":{features.averageVolume}}}}}";
-
-                byte[] bytes = Encoding.UTF8.GetBytes(json);
-                await _webSocket.SendAsync(
-                    new ArraySegment<byte>(bytes),
-                    WebSocketMessageType.Text, true, _cts.Token);
-                
-                _isFirstChunk = true;
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"[STT] Failed to send end utterance: {e.Message}");
-            }
-            finally
-            {
-                _sendLock.Release();
-            }
+            string featuresJson = features != null ? JsonUtility.ToJson(features) : "{}";
+            string json = $"{{\"type\":\"utterance_end\",\"session_id\":\"{EscapeJson(sessionId)}\",\"features\":{featuresJson}}}";
+            return EnqueuePacket(
+                Encoding.UTF8.GetBytes(json),
+                WebSocketMessageType.Text,
+                "utterance_end",
+                resetUtteranceStateAfterSend: true);
         }
 
         /// <summary>
         /// 재발화 교정 종료 신호와 메타데이터를 전송
         /// </summary>
-        public async Task SendCorrectionEndUtteranceAsync(FeatureData features, int startIdx, int endIdx, string[] originalWords)
+        public Task SendCorrectionEndUtteranceAsync(FeatureData features, int startIdx, int endIdx, string[] originalWords)
         {
-            if (_webSocket?.State != WebSocketState.Open) return;
-
-            await _sendLock.WaitAsync();
-            try
+            string wordsJson = "[]";
+            if (originalWords != null && originalWords.Length > 0)
             {
-                string wordsJson = "[]";
-                if (originalWords != null && originalWords.Length > 0)
+                StringBuilder sb = new StringBuilder("[");
+                for (int i = 0; i < originalWords.Length; i++)
                 {
-                    StringBuilder sb = new StringBuilder("[");
-                    for (int i = 0; i < originalWords.Length; i++)
-                    {
-                        sb.Append($"\"{originalWords[i].Replace("\"", "\\\"")}\"");
-                        if (i < originalWords.Length - 1) sb.Append(",");
-                    }
-                    sb.Append("]");
-                    wordsJson = sb.ToString();
+                    sb.Append($"\"{originalWords[i].Replace("\"", "\\\"")}\"");
+                    if (i < originalWords.Length - 1) sb.Append(",");
                 }
+                sb.Append("]");
+                wordsJson = sb.ToString();
+            }
 
-                string json = $"{{\"type\":\"utterance_end\"," +
-                              $"\"session_id\":\"{EscapeJson(sessionId)}\"," +
-                              $"\"mode\":\"correction\"," +
-                              $"\"target_range\":[{startIdx},{endIdx}]," +
-                              $"\"original_words\":{wordsJson}," +
-                              $"\"features\":{{" +
-                              $"\"speakingTime\":{features.speakingTime:F2}," +
-                              $"\"pauseCount\":{features.meaningfulPauseCount}," +
-                              $"\"averageVolume\":{features.averageVolume}}}}}";
+            string featuresJson = features != null ? JsonUtility.ToJson(features) : "{}";
+            string json = $"{{\"type\":\"utterance_end\"," +
+                          $"\"session_id\":\"{EscapeJson(sessionId)}\"," +
+                          $"\"mode\":\"correction\"," +
+                          $"\"target_range\":[{startIdx},{endIdx}]," +
+                          $"\"original_words\":{wordsJson}," +
+                          $"\"features\":{featuresJson}}}";
 
-                byte[] bytes = Encoding.UTF8.GetBytes(json);
-                await _webSocket.SendAsync(
-                    new ArraySegment<byte>(bytes),
-                    WebSocketMessageType.Text, true, _cts.Token);
-                
-                _isFirstChunk = true;
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"[STT] Failed to send correction end utterance: {e.Message}");
-            }
-            finally
-            {
-                _sendLock.Release();
-            }
+            return EnqueuePacket(
+                Encoding.UTF8.GetBytes(json),
+                WebSocketMessageType.Text,
+                "correction utterance_end",
+                resetUtteranceStateAfterSend: true);
         }
 
         /// <summary>
         /// 수정 없이 그대로 질문을 전송
         /// </summary>
-        public async Task SendAnywayAsync(string text, FeatureData features)
+        public Task SendAnywayAsync(string text, FeatureData features)
         {
-            if (_webSocket?.State != WebSocketState.Open) return;
+            string featuresJson = features != null ? JsonUtility.ToJson(features) : "{}";
+            string json = $"{{\"type\":\"send_anyway\"," +
+                          $"\"session_id\":\"{EscapeJson(sessionId)}\"," +
+                          $"\"text\":\"{EscapeJson(text)}\"," +
+                          $"\"features\":{featuresJson}}}";
 
-            await _sendLock.WaitAsync();
-            try
-            {
-                string json = $"{{\"type\":\"send_anyway\"," +
-                              $"\"session_id\":\"{EscapeJson(sessionId)}\"," +
-                              $"\"text\":\"{text.Replace("\"", "\\\"")}\"," +
-                              $"\"features\":{{" +
-                              $"\"speakingTime\":{features.speakingTime:F2}," +
-                              $"\"pauseCount\":{features.meaningfulPauseCount}," +
-                              $"\"averageVolume\":{features.averageVolume}}}}}";
-
-                byte[] bytes = Encoding.UTF8.GetBytes(json);
-                await _webSocket.SendAsync(
-                    new ArraySegment<byte>(bytes),
-                    WebSocketMessageType.Text, true, _cts.Token);
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"[STT] Failed to send send_anyway command: {e.Message}");
-            }
-            finally
-            {
-                _sendLock.Release();
-            }
+            return EnqueuePacket(
+                Encoding.UTF8.GetBytes(json),
+                WebSocketMessageType.Text,
+                "send_anyway");
         }
 
         /// <summary>
         /// 교정을 포기하고 전체 발화를 폐기
         /// </summary>
-        public async Task SendDiscardAsync()
+        public Task SendDiscardAsync()
         {
-            if (_webSocket?.State != WebSocketState.Open) return;
-
-            await _sendLock.WaitAsync();
-            try
-            {
-                string json = $"{{\"type\":\"discard\",\"session_id\":\"{EscapeJson(sessionId)}\"}}";
-                byte[] bytes = Encoding.UTF8.GetBytes(json);
-                await _webSocket.SendAsync(
-                    new ArraySegment<byte>(bytes),
-                    WebSocketMessageType.Text, true, _cts.Token);
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"[STT] Failed to send discard command: {e.Message}");
-            }
-            finally
-            {
-                _sendLock.Release();
-            }
+            string json = $"{{\"type\":\"discard\",\"session_id\":\"{EscapeJson(sessionId)}\"}}";
+            return EnqueuePacket(
+                Encoding.UTF8.GetBytes(json),
+                WebSocketMessageType.Text,
+                "discard");
         }
 
-        private async Task ReceiveLoop()
+        private async Task ReceiveLoop(ClientWebSocket socket, CancellationTokenSource socketCts)
         {
             byte[] buffer = new byte[1024 * 32];
             using (var ms = new System.IO.MemoryStream())
             {
-                while (_webSocket.State == WebSocketState.Open)
+                while (socket.State == WebSocketState.Open && !socketCts.IsCancellationRequested)
                 {
                     WebSocketReceiveResult result = null;
                     try
@@ -309,14 +374,14 @@ namespace VerbalProcess
                         ms.SetLength(0); // 매 메시지마다 스트림 초기화
                         do
                         {
-                            result = await _webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), _cts.Token);
+                            result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), socketCts.Token);
                             if (result.MessageType == WebSocketMessageType.Close) break;
                             ms.Write(buffer, 0, result.Count);
                         } while (!result.EndOfMessage);
 
                         if (result.MessageType == WebSocketMessageType.Close)
                         {
-                            await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, string.Empty, _cts.Token);
+                            await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, string.Empty, socketCts.Token);
                             _ = ScheduleReconnectAsync();
                             break;
                         }
@@ -338,11 +403,7 @@ namespace VerbalProcess
                             try
                             {
                                 ServerMessage msg = JsonUtility.FromJson<ServerMessage>(message);
-                                if (msg.type == "request_end")
-                                {
-                                    OnServerRequestEnd?.Invoke();
-                                }
-                                else if (msg.type == "final")
+                                if (msg.type == "final")
                                 {
                                     FinalResponse response = JsonUtility.FromJson<FinalResponse>(message);
                                     OnTranscriptionReceived?.Invoke(response);
@@ -361,6 +422,14 @@ namespace VerbalProcess
                                 {
                                     OnAudioStreamEnded?.Invoke();
                                 }
+                                else if (msg.type == "adaptive_vad_trigger")
+                                {
+                                    OnSentenceCompletedFlag?.Invoke();
+                                }
+                                else if (msg.type == "stt_skip")
+                                {
+                                    OnSttSkipped?.Invoke();
+                                }
                             }
                             catch (Exception e)
                             {
@@ -368,13 +437,40 @@ namespace VerbalProcess
                             }
                         }
                     }
+                    catch (OperationCanceledException) when (socketCts.IsCancellationRequested)
+                    {
+                        break;
+                    }
                     catch (Exception e)
                     {
                         Debug.LogError($"[STT] Receive Loop Error: {e.Message}");
+                        if (ReferenceEquals(_webSocket, socket))
+                        {
+                            _cts?.Cancel();
+                            _webSocket?.Dispose();
+                        }
                         _ = ScheduleReconnectAsync();
                         break;
                     }
                 }
+            }
+        }
+
+        private sealed class OutgoingPacket
+        {
+            public readonly byte[] Payload;
+            public readonly WebSocketMessageType MessageType;
+            public readonly string Description;
+            public readonly bool ResetUtteranceStateAfterSend;
+            public readonly TaskCompletionSource<bool> Completion =
+                new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public OutgoingPacket(byte[] payload, WebSocketMessageType messageType, string description, bool resetUtteranceStateAfterSend)
+            {
+                Payload = payload;
+                MessageType = messageType;
+                Description = description;
+                ResetUtteranceStateAfterSend = resetUtteranceStateAfterSend;
             }
         }
 
@@ -400,7 +496,11 @@ namespace VerbalProcess
             public string sttText;
             public float speakingTime;
             public int pauseCount;
+            public int meaningfulPauseCount;
+            public float volumeVariance;
+            public float lowVolumeRatio;
             public float averageVolume;
+            public float responseTime;
         }
 
         [Serializable]

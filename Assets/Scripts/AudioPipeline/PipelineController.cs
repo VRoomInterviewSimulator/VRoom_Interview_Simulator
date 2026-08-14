@@ -45,10 +45,11 @@ namespace VerbalProcess
 
             if (sttManager != null)
             {
-                sttManager.OnServerRequestEnd += HandleServerRequestEnd;
                 sttManager.OnTranscriptionReceived += HandleTranscriptionReceived;
                 sttManager.OnAudioStreamEnded += HandleAudioStreamEnded;
                 sttManager.OnCorrectionRequested += HandleOnCorrectionRequested;
+                sttManager.OnSentenceCompletedFlag += HandleSentenceCompletedFlag;
+                sttManager.OnSttSkipped += HandleSttSkipped;
                 
                 if (speaker != null)
                 {
@@ -71,10 +72,11 @@ namespace VerbalProcess
 
             if (sttManager != null)
             {
-                sttManager.OnServerRequestEnd -= HandleServerRequestEnd;
                 sttManager.OnTranscriptionReceived -= HandleTranscriptionReceived;
                 sttManager.OnAudioStreamEnded -= HandleAudioStreamEnded;
                 sttManager.OnCorrectionRequested -= HandleOnCorrectionRequested;
+                sttManager.OnSentenceCompletedFlag -= HandleSentenceCompletedFlag;
+                sttManager.OnSttSkipped -= HandleSttSkipped;
 
                 if (speaker != null)
                 {
@@ -106,11 +108,30 @@ namespace VerbalProcess
             }
         }
 
-        private void HandleServerRequestEnd()
+        private void HandleSentenceCompletedFlag()
         {
             if (vad != null)
             {
-                vad.ForceEnd();
+                vad.SetSentenceCompleted();
+            }
+        }
+
+        /// <summary>
+        /// STT 결과가 빈 전사로 스킵된 경우: Speaker 상태를 건드리지 않고 VAD만 재활성화합니다.
+        /// </summary>
+        private void HandleSttSkipped()
+        {
+            // 교정 패널이 열려 있는 상태라면 VAD를 활성화하지 않습니다. (HandlePlaybackFinished와 동일한 가드)
+            if (_isCorrectionPanelOpen)
+            {
+                Debug.Log("[Pipeline] STT skipped, but correction panel is open. VAD remains disabled.");
+                return;
+            }
+
+            Debug.Log("[Pipeline] STT skipped (empty transcription). Re-enabling VAD without touching Speaker.");
+            if (vad != null)
+            {
+                vad.enabled = true;
             }
         }
 
@@ -219,11 +240,11 @@ namespace VerbalProcess
                 _originalFeatures = new FeatureData(new VoiceActivityDetector.VoiceFeatures
                 {
                     speakingTime = msg.data.speakingTime,
-                    meaningfulPauseCount = msg.data.pauseCount,
+                    meaningfulPauseCount = msg.data.meaningfulPauseCount,
                     averageVolume = msg.data.averageVolume,
-                    volumeVariance = 0f,
-                    lowVolumeRatio = 0f,
-                    responseTime = 0f
+                    volumeVariance = msg.data.volumeVariance,
+                    lowVolumeRatio = msg.data.lowVolumeRatio,
+                    responseTime = msg.data.responseTime
                 });
             }
 

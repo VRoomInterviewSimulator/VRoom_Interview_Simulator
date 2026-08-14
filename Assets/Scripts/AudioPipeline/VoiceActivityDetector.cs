@@ -14,7 +14,9 @@ namespace VerbalProcess
     {
         [Header("Settings")]
         [SerializeField] private float threshold = 0.02f;
-        private const float silenceDurationThreshold = 1.5f;
+        [SerializeField] private float defaultSilenceThreshold = 3.0f;
+        [SerializeField] private float shortSilenceThreshold = 1.0f;
+        private float silenceDurationThreshold = 3.0f;
         [SerializeField] private float chunkSendInterval = 0.3f; // 0.3초마다 청크 전송
         [SerializeField] private int sampleRate = 16000; //whisper는 16khz를 사용함
         [SerializeField] private int bufferLengthSeconds = 300;
@@ -141,6 +143,9 @@ namespace VerbalProcess
                 }
                 if (silenceTimer > 0f)
                 {
+                    // 문장 종결 감지 후 침묵 임계값이 짧아진 상태에서 발화가 재개되면
+                    // 다음 침묵부터는 기본 임계값을 사용합니다.
+                    silenceDurationThreshold = defaultSilenceThreshold;
                     wasMeaningfulSilence = false;
                     silenceTimer = 0f;
                 }
@@ -165,7 +170,7 @@ namespace VerbalProcess
 
                 if (silenceTimer >= silenceDurationThreshold)
                 {
-                    EndSpeaking(currentPosition);
+                    EndSpeaking(currentPosition, silenceDurationThreshold);
                 }
             }
         }
@@ -175,6 +180,7 @@ namespace VerbalProcess
             isSpeaking = true;
             utteranceStartTime = Time.time;
             lastChunkEndSample = currentPosition; // 청크 시작 지점 초기화
+            silenceDurationThreshold = defaultSilenceThreshold;
             meaningfulPauseCount = 0;
             wasMeaningfulSilence = false;
             rmsSamples.Clear();
@@ -182,24 +188,23 @@ namespace VerbalProcess
             Debug.Log("Speaking Started");
         }
 
+        /// <summary>
+        /// STT의 부분 전사에서 문장 종결이 감지되면 침묵 종료 임계값을 줄입니다.
+        /// 최종 전사 결과나 채점 데이터에는 관여하지 않습니다.
+        /// </summary>
+        public void SetSentenceCompleted()
+        {
+            if (isSpeaking)
+            {
+                silenceDurationThreshold = shortSilenceThreshold;
+                Debug.Log($"[VAD] Sentence completed detected. Silence threshold reduced to {silenceDurationThreshold}s.");
+            }
+        }
+
         private void SendChunk(int currentPosition)
         {
             AudioClip trimmedClip = AudioUtils.TrimAudio(micClip, lastChunkEndSample, currentPosition);
             OnAudioChunkCaptured?.Invoke(trimmedClip);
-        }
-
-        /// <summary>
-        /// 서버의 요청 등에 의해 발화를 강제로 종료합니다.
-        /// </summary>
-        public void ForceEnd()
-        {
-            if (isSpeaking)
-            {
-                Debug.Log("[VAD] Forced End triggered by external signal.");
-                EndSpeaking(Microphone.GetPosition(micDevice), 0.9f);
-                // 타이머 리셋하여 중복 종료 방지
-                silenceTimer = 0f;
-            }
         }
 
         private void OnEnable()
@@ -212,13 +217,15 @@ namespace VerbalProcess
                 silenceTimer = 0f;
                 chunkTimer = 0f;
                 isSpeaking = false;
+                silenceDurationThreshold = defaultSilenceThreshold;
                 Debug.Log("[VAD] Re-enabled. Syncing sample position.");
             }
         }
 
-        private void EndSpeaking(int currentPosition, float silenceDuration = silenceDurationThreshold)
+        private void EndSpeaking(int currentPosition, float silenceDuration)
         {
             isSpeaking = false;
+            silenceDurationThreshold = defaultSilenceThreshold;
             
             // 침묵 임계값만큼 이전이 실제 발화가 종료된 시점
             int silenceSamples = (int)(silenceDuration * sampleRate);
@@ -235,7 +242,7 @@ namespace VerbalProcess
                 trimmedClip = AudioUtils.TrimAudio(micClip, lastChunkEndSample, utteranceEndSample);
             }
 
-            float duration = Time.time - utteranceStartTime - silenceDurationThreshold;
+            float duration = Time.time - utteranceStartTime - silenceDuration;
             float avgRms = rmsSamples.Count > 0 ? rmsSamples.Average() : 0f;
 
             float volumeVariance = 0f;
@@ -272,9 +279,18 @@ namespace VerbalProcess
             }
 
             OnUtteranceEnded?.Invoke(features);
-            
-            float clipLength = trimmedClip != null ? trimmedClip.length : 0f;
-            Debug.Log($"Speaking Ended. Trimmed Clip Length: {clipLength:F2}s, Avg Volume: {features.averageVolume}");
+
+            // [로그 설명]
+            // tail chunk(마지막 잔여 클립)가 null인 것은 오류가 아닌 정상 동작입니다.
+            // 침묵이 시작되는 첫 프레임(ProcessVAD의 silenceTimer == 0f 분기)에서
+            // 이미 SendChunk()로 해당 구간을 전송하고 lastChunkEndSample을 앞당겨 두기 때문에,
+            // utteranceEndSample과 lastChunkEndSample 사이의 잔여 샘플이 800개(0.05초) 미만이 되어
+            // tail clip 생성 조건을 통과하지 못합니다.
+            // features 값은 trimmedClip 생성 여부와 무관하게 rmsSamples로 독립적으로 계산됩니다.
+            string tailInfo = trimmedClip != null
+                ? $"Tail chunk sent: {trimmedClip.length:F2}s"
+                : "No tail chunk (already flushed at silence start)";
+            Debug.Log($"Speaking Ended. {tailInfo}, Avg Volume: {features.averageVolume:F4}, Speaking Time: {features.speakingTime:F2}s");
 
             // 발화가 끝나면 다음 입력을 막기 위해 스스로를 비활성화 (Barge-in 미사용 시)
             this.enabled = false;

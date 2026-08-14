@@ -432,7 +432,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VerbalProcess.VoiceActivityDetector
   threshold: 0.02
-  silenceDurationThreshold: 1.5
+  defaultSilenceThreshold: 3
+  shortSilenceThreshold: 1
   chunkSendInterval: 0.3
   sampleRate: 16000
   bufferLengthSeconds: 300
