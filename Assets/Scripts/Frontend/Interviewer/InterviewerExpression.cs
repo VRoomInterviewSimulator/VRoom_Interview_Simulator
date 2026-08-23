@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -26,7 +27,8 @@ namespace VRoom.Backend
         [Header("프리셋")]
         public Preset neutral;
         public Preset positive;
-        public Preset negative; 
+        public Preset negative;
+        public Preset firmStop;
 
         [SerializeField] float lerpSpeed = 6f;
 
@@ -50,6 +52,29 @@ namespace VRoom.Backend
                 _current.Add(new Dictionary<int, float>());
                 _target.Add(new Dictionary<int, float>());
             }
+
+            ValidatePreset(nameof(neutral), neutral);
+            ValidatePreset(nameof(positive), positive);
+            ValidatePreset(nameof(negative), negative);
+            ValidatePreset(nameof(firmStop), firmStop);
+        }
+
+        private void ValidatePreset(string label, Preset p)
+        {
+            if (p?.shapes == null || p.shapes.Length == 0)
+            {
+                Debug.LogWarning($"[표정] 프리셋 '{label}' 이 비어 있습니다.");
+                return;
+            }
+            foreach (var s in p.shapes)
+            {
+                bool found = false;
+                for (int m = 0; m < _index.Count; m++)
+                    if (_index[m].ContainsKey(s.name)) { found = true; break; }
+                if (!found)
+                    Debug.LogError($"[표정] 프리셋 '{label}' 의 셰이프 '{s.name}' 을 " +
+                                   $"어떤 faceMeshes 에서도 찾을 수 없습니다. 오타 확인.");
+            }
         }
 
         public void Apply(int expressionId)
@@ -58,6 +83,7 @@ namespace VRoom.Backend
             {
                 1 or 3 => positive,
                 2 => negative,
+                5 => firmStop,
                 _ => neutral,   // 0, 4
             };
 

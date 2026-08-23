@@ -7820,9 +7820,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VerbalProcess.VoiceActivityDetector
   threshold: 0.02
+  defaultSilenceThreshold: 3
+  shortSilenceThreshold: 1
   chunkSendInterval: 0.3
   sampleRate: 16000
   bufferLengthSeconds: 300
+  longAnswerThreshold: 15
+  echoGuardMultiplier: 2.5
+  echoGuardBlindSec: 1
   meaningfulPauseThreshold: 0.4
   lowVolumeRatioThreshold: 0.3
 --- !u!114 &817680392
@@ -7856,6 +7861,12 @@ MonoBehaviour:
   speaker: {fileID: 1535098248}
   subtitleText: {fileID: 1362508803}
   correctionPanel: {fileID: 1076225538}
+  longSilenceThreshold: 10
+  bargeInFallbackTimeout: 10
+  postBargeInTimeout: 12
+  backend: {fileID: 2146786189}
+  interviewerDriver: {fileID: 1535098251}
+  expression: {fileID: 1535098252}
 --- !u!4 &817680394
 Transform:
   m_ObjectHideFlags: 0
@@ -8017,13 +8028,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VRoom.Multimodal.BehaviorCollector
   client: {fileID: 828765548}
-  vad: {fileID: 817680391}
-  speaker: {fileID: 1535098248}
+  pipeline: {fileID: 817680393}
   backend: {fileID: 2146786189}
   calibrationSeconds: 3
   calibrateOnStart: 1
-  _inTurn: 0
-  _currentStage: 
+  _turnOpen: 0
+  _openStage: 
+  _openPhase: NORMAL
   _calibrated: 0
 --- !u!1 &843333400
 GameObject:
@@ -14850,6 +14861,7 @@ MonoBehaviour:
   volume: 1
   bufferThresholdChunks: 3
   lipSync: {fileID: 1372484131}
+  cutinClips: []
   secondsPerChar: 0.18
   maxSubtitleCharacters: 85
   trimStepCharacters: 30
@@ -14972,7 +14984,7 @@ MonoBehaviour:
   speaker: {fileID: 1535098248}
   expression: {fileID: 1535098252}
   resultUI: {fileID: 236281200}
-  vad: {fileID: 817680391}
+  pipeline: {fileID: 817680393}
   stt: {fileID: 817680392}
   company: 
   jobTitle: 
@@ -15033,6 +15045,20 @@ MonoBehaviour:
       weight: 30
     - name: Mouth_Frown_R
       weight: 30
+  firmStop:
+    shapes:
+    - name: Brow_Drop_L
+      weight: 75
+    - name: Brow_Drop_R
+      weight: 75
+    - name: Brow_Compress_L
+      weight: 60
+    - name: Brow_Compress_R
+      weight: 60
+    - name: Eye_Squint_L
+      weight: 35
+    - name: Eye_Squint_R
+      weight: 35
   lerpSpeed: 6
 --- !u!1 &1540725017
 GameObject:
@@ -19937,7 +19963,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -591.4992, y: 191.49977}
+  m_AnchoredPosition: {x: -591.4996, y: 191.4994}
   m_SizeDelta: {x: 1200, y: 100}
   m_Pivot: {x: 0, y: 1}
 --- !u!114 &1951308403
@@ -21666,8 +21692,8 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1755399022}
   m_HandleRect: {fileID: 1755399021}
   m_Direction: 0
-  m_Value: -0.000046673944
-  m_Size: 0.98583204
+  m_Value: -0.000025132123
+  m_Size: 0.98583335
   m_NumberOfSteps: 0
   m_OnValueChanged:
     m_PersistentCalls:

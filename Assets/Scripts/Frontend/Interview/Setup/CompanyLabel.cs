@@ -6,8 +6,12 @@ namespace VRoom.Backend
 {
     /// <summary>
     /// TV/안내판 등에 표시되는 "XX 회사 면접" 텍스트를
-    /// SetupScene 에서 불러온 이력서 txt 의 [기업]/[직무] 값으로 치환한다.
-    /// TMP_Text(월드 스페이스 TextMeshPro / UI TextMeshProUGUI) 모두 지원.
+    /// SetupScene 에서 불러온 txt 의 [기업]/[직무] 값으로 치환한다.
+    /// TMP_Text(월드 스페이스 TextMeshPro / UI TextMeshProUGUI) 모두 지원한다.
+    ///
+    /// 기업명 길이가 제각각이라 줄바꿈이 생기면 안내판 레이아웃이 무너진다.
+    /// 그래서 Wrapping 을 끄고 AutoSize 를 켜서 '한 줄 유지 + 폰트 축소'로 처리한다.
+    /// 인스펙터에서 잊고 설정하지 않는 일이 잦아 코드로 강제한다.
     /// </summary>
     [DisallowMultipleComponent]
     public class CompanyLabel : MonoBehaviour
@@ -29,6 +33,7 @@ namespace VRoom.Backend
         [SerializeField] private float fontSizeMin = 8f;
         [SerializeField] private float fontSizeMax = 72f;
 
+        // 기업명이나 직무가 비었을 때 format 결과에 공백이 겹치는 것을 정리한다.
         private static readonly Regex MultiSpace = new Regex(@"\s{2,}");
 
         private void Awake()
@@ -37,6 +42,8 @@ namespace VRoom.Backend
                 target = GetComponent<TMP_Text>();
         }
 
+        // Awake 가 아니라 Start 에서 Apply 하는 이유:
+        // InterviewConfig 값이 씬 로드 직후에 채워지므로 한 프레임 뒤에 읽어야 안전하다.
         private void Start()
         {
             if (enforceSingleLineAutoFit)
@@ -47,7 +54,7 @@ namespace VRoom.Backend
         /// <summary>Wrapping 끄고 Auto Size 켜기 = 길어지면 한 줄에서 폰트만 작아짐.</summary>
         public void ApplyAutoFitSettings()
         {
-            if (target == null) 
+            if (target == null)
                 return;
 
             target.overflowMode = TextOverflowModes.Overflow;
@@ -66,11 +73,11 @@ namespace VRoom.Backend
             }
 
             string company = InterviewConfig.CompanyShort;
-            if (string.IsNullOrWhiteSpace(company)) 
+            if (string.IsNullOrWhiteSpace(company))
                 company = fallbackCompany;
 
             string job = InterviewConfig.JobTitleShort;
-            if (string.IsNullOrWhiteSpace(job)) 
+            if (string.IsNullOrWhiteSpace(job))
                 job = fallbackJob;
 
             string text = string.Format(format, company, job);
@@ -83,7 +90,7 @@ namespace VRoom.Backend
 #if UNITY_EDITOR
         private void OnValidate()
         {
-            if (target == null) 
+            if (target == null)
                 target = GetComponent<TMP_Text>();
         }
 #endif

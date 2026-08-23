@@ -1,86 +1,92 @@
-using System;
-using System.Collections.Generic;
 using UnityEngine;
-using VerbalProcess;
 
 namespace VerbalProcess
 {
+    /// <summary>
+    /// 단어 칩을 왼쪽부터 채우며 줄바꿈하는 간이 레이아웃.
+    ///
+    /// [왜 HorizontalLayoutGroup 을 쓰지 않는가]
+    ///   Unity 기본 레이아웃 그룹은 자동 줄바꿈(flow)을 지원하지 않는다.
+    ///   칩 너비가 단어마다 제각각이므로 직접 계산해 배치한다.
+    ///
+    /// [UI 좌표계 주의]
+    ///   아래로 갈수록 Y 가 **작아진다**. 줄을 내릴 때 마이너스 연산을 쓴다.
+    ///
+    /// [호출 순서]
+    ///   Initialize() -> AddChips() * N -> UpdateHeight()
+    ///   AddChips 전에 Canvas.ForceUpdateCanvases() 로 칩 너비가 확정되어야 한다.
+    /// </summary>
     [RequireComponent(typeof(RectTransform))]
     public class WordLayout : MonoBehaviour
     {
-        [SerializeField] private float verticalGap = 50;
-        [SerializeField] private float horizontalGap = 10;
-        [SerializeField] private float leftPadding = 0; 
-        [SerializeField] private float rightPadding = 0; 
+        [SerializeField] private float verticalGap = 50;      // 줄 간격 (= 한 줄 높이)
+        [SerializeField] private float horizontalGap = 10;    // 칩 사이 간격
+        [SerializeField] private float leftPadding = 0;
+        [SerializeField] private float rightPadding = 0;
         [SerializeField] private float verticalPadding = 0;
 
-        private Vector2 postionToInstantiate;
+        private Vector2 positionToInstantiate;   // 다음 칩을 놓을 위치
         private float layoutWidth;
         private RectTransform rectTransform;
-        private float initialHeight;
+        private float initialHeight;             // 에디터에 설정된 기본 높이 (복원용)
 
         private void Start()
         {
             rectTransform = GetComponent<RectTransform>();
-            initialHeight = rectTransform.rect.height; // 에디터 상에 설정된 기본 높이를 기억합니다.
+            initialHeight = rectTransform.rect.height;
             Initialize();
         }
 
-        // 패널이 열리거나 칩을 배치하기 전에 명시적으로 호출하여 크기와 위치를 초기화합니다.
+        /// <summary>배치 좌표와 높이를 초기 상태로 되돌린다. 칩을 깔기 전에 호출한다.</summary>
         public void Initialize()
         {
             if (rectTransform == null)
                 rectTransform = GetComponent<RectTransform>();
 
-            // UI 좌표계상 아래로 내려갈수록 Y좌표는 마이너스(-) 방향이 되므로 verticalPadding을 빼줍니다.
-            postionToInstantiate = new Vector2(leftPadding, -verticalPadding);
+            // UI 좌표계는 아래로 갈수록 Y 가 작아지므로 패딩을 뺀다.
+            positionToInstantiate = new Vector2(leftPadding, -verticalPadding);
 
-            // 칩이 초기화되면 높이도 에디터 상의 원래 기본 높이로 복원해 줍니다.
+            // 이전 교정에서 늘어난 높이를 원래대로 복원한다.
             if (initialHeight > 0)
-            {
                 rectTransform.sizeDelta = new Vector2(rectTransform.sizeDelta.x, initialHeight);
-            }
         }
 
+        /// <summary>칩 하나를 다음 자리에 놓는다. 줄이 넘치면 자동으로 줄바꿈한다.</summary>
         public void AddChips(WordChip chip)
         {
-            layoutWidth = rectTransform.rect.width; // Start에는 넣으면 안됨
+            // Start 시점에는 레이아웃이 확정되지 않아 0 이 나올 수 있어 매번 읽는다.
+            layoutWidth = rectTransform.rect.width;
+
             RectTransform chipRect = chip.GetComponent<RectTransform>();
             float chipWidth = chipRect.rect.width;
 
-            // 다음 배치될 위치의 오른쪽 끝이 (전체너비 - 우측패딩)을 넘으면 줄바꿈을 수행합니다.
-            // (가로 판단을 위해 verticalGap 대신 horizontalGap 또는 0을 사용하여 조건 검사)
-            if ((postionToInstantiate.x + chipWidth) > (layoutWidth - rightPadding))
+            // 오른쪽 끝을 넘으면 줄바꿈
+            if ((positionToInstantiate.x + chipWidth) > (layoutWidth - rightPadding))
             {
-                postionToInstantiate.x = leftPadding;
-                postionToInstantiate.y -= verticalGap; // UI 좌표계 기준 아래로 내리기 위해 마이너스(-) 연산
+                positionToInstantiate.x = leftPadding;
+                positionToInstantiate.y -= verticalGap;
             }
 
-            // 먼저 올바르게 결정된 위치에 칩을 배치합니다.
-            chipRect.localPosition = postionToInstantiate;
+            chipRect.localPosition = positionToInstantiate;
 
-            // 배치한 이후에 다음 칩을 배치할 X좌표를 누적 계산합니다.
-            postionToInstantiate.x += (chipWidth + horizontalGap);
+            // 배치한 뒤에 다음 자리를 계산한다 (순서가 바뀌면 한 칸씩 밀린다).
+            positionToInstantiate.x += (chipWidth + horizontalGap);
         }
 
-        // 단어 칩이 추가되어 실제 배치 영역이 Rect의 높이보다 커지면 세로 크기를 갱신합니다.
-        public void updateheight()
+        /// <summary>
+        /// 배치가 끝난 뒤 Content 높이를 실제 필요한 만큼 늘린다.
+        /// 이걸 호출하지 않으면 칩이 영역 밖으로 나가도 스크롤이 생기지 않는다.
+        /// </summary>
+        public void UpdateHeight()
         {
-            // postionToInstantiate.y는 음수이므로 절대값으로 바꾼 뒤, 
-            // 마지막 라인의 높이(verticalGap)와 하단 여백(verticalPadding)을 더해 총 필요한 높이를 구합니다.
-            float neededHeight = Mathf.Abs(postionToInstantiate.y) + verticalGap + verticalPadding;
+            // Y 는 음수이므로 절대값으로 바꾼 뒤 마지막 줄 높이와 하단 여백을 더한다.
+            float neededHeight = Mathf.Abs(positionToInstantiate.y) + verticalGap + verticalPadding;
 
-            // 실제 필요한 높이가 현재 RectTransform의 높이보다 클 경우에만 확장합니다.
             if (neededHeight > rectTransform.rect.height)
-            {
                 rectTransform.sizeDelta = new Vector2(rectTransform.sizeDelta.x, neededHeight);
-            }
         }
 
-        public void ClearChips()
-        {
-            // Clear 시 다시 초기 상태 좌표로 되돌립니다.
-            Initialize();
-        }
+        /// <summary>칩을 지운 뒤 좌표를 초기 상태로 되돌린다.</summary>
+        public void ClearChips() => Initialize();
     }
 }

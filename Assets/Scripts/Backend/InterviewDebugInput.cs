@@ -12,7 +12,13 @@ namespace VRoom.Backend
     /// InterviewerDriver 가 면접관 Animator(Expression_ID/Gesture_ID)를 움직인다.
     ///
     /// 사용법: 아무 GameObject 에 이 컴포넌트를 부착하고 Play. (씬 UI 설정 불필요)
-    /// 완성 후에는 이 컴포넌트를 비활성화하거나 삭제하면 된다.
+    ///
+    /// 주의: /process 는 레거시 HTTP 경로다. 실제 STT 워커는 /ws/tts 를 쓰므로,
+    /// 이 패널로 보낸 답변은 개입(barge-in) 경로를 타지 않는다.
+    /// 개입 검증에는 쓸 수 없고 페르소나 전이 확인 용도로만 유효하다.
+    ///
+    /// 실험 세션에서는 반드시 비활성화할 것. OnGUI 패널이 화면에 남으면
+    /// 참가자 시선이 그쪽으로 쏠려 시선 지표가 오염된다.
     /// </summary>
     public class InterviewDebugInput : MonoBehaviour
     {
