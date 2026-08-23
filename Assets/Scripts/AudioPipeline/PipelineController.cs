@@ -64,6 +64,10 @@ namespace VerbalProcess
                + "짧게 잡으면 숨 고르기를 양보로 오판한다.")]
         [SerializeField] private float yieldSilenceSec = 1.5f;
 
+        [Header("STT 교정")]
+        [Tooltip("체크하면 저신뢰 전사를 사용자에게 묻지 않고 그대로 채점에 넘긴다. 실험 세션에서는 반드시 체크.")]
+        [SerializeField] private bool autoAcceptLowConfidence = true;
+
         // ===================================================================
         // 3. 상태
         // ===================================================================
@@ -611,14 +615,37 @@ namespace VerbalProcess
         /// </summary>
         private void HandleOnCorrectionRequested(STTManager.CorrectionRequestMessage msg)
         {
-            if (_state == TurnState.BargeInPending || _state == TurnState.Interrupting)
+            // 실험 모드 / 개입 중에는 교정 UI 를 띄우지 않는다.
+            // 다만 '무시'하면 워커가 final 을 보내지 않아 답변이 통째로 유실되므로,
+            // 반드시 send_anyway 로 원본 전사를 그대로 확정시켜야 한다.
+            bool bypass = autoAcceptLowConfidence
+                          || _state == TurnState.BargeInPending
+                          || _state == TurnState.Interrupting;
+
+            if (bypass)
             {
-                Debug.Log("[Pipeline] 개입 중 correction_request 수신 - 무시");
+                Debug.Log($"[Pipeline] 저신뢰 전사 자동 수용 (state={_state})");
+
+                _originalTextForCorrection = msg.data != null ? msg.data.sttText : "";
+                if (msg.data != null)
+                {
+                    _originalFeatures = new FeatureData(new VoiceActivityDetector.VoiceFeatures
+                    {
+                        speakingTime = msg.data.speakingTime,
+                        meaningfulPauseCount = msg.data.meaningfulPauseCount,
+                        averageVolume = msg.data.averageVolume,
+                        volumeVariance = msg.data.volumeVariance,
+                        lowVolumeRatio = msg.data.lowVolumeRatio,
+                        responseTime = msg.data.responseTime
+                    });
+                }
+
+                HandleSendAnyway();   // 내부에서 ResetCorrectionState() 까지 처리
                 return;
             }
 
+            // 이하 기존 패널 오픈 경로 (개발 중 디버그용으로만 남긴다)
             Debug.Log("[Pipeline] Low confidence STT detected. Opening correction panel.");
-
             SetTurnState(TurnState.Correcting);
             _isCorrectionPanelOpen = true;
 
