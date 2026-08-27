@@ -59,6 +59,16 @@ namespace VRoom.Backend
             if (!string.IsNullOrEmpty(InterviewConfig.SessionId))
                 sessionId = InterviewConfig.SessionId;
 
+            // 실험 조건은 셋업 txt 에서만 온다. 비어 있으면 파싱 단계가 뚫린 것이므로
+            // 조용히 기본값으로 넘기지 않고 오류로 남긴다 (데이터 오염 방지).
+            string condition = InterviewConfig.Condition;
+            if (string.IsNullOrEmpty(condition))
+            {
+                condition = "C";
+                Debug.LogError("[Backend] 실험 조건이 비어 있습니다. C 로 진행하지만 "
+                             + "이 세션의 데이터는 조건 미상으로 취급해야 합니다.");
+            }
+
             _cts = new CancellationTokenSource();
             _ws = new ClientWebSocket();
             await _ws.ConnectAsync(new Uri(backendUrl), _cts.Token);
@@ -70,10 +80,12 @@ namespace VRoom.Backend
                 $"\"company\":\"{Escape(company)}\"," +
                 $"\"job_title\":\"{Escape(jobTitle)}\"," +
                 $"\"resume\":\"{Escape(resume)}\"," +
+                $"\"condition\":\"{Escape(condition)}\"," +
                 $"\"prewarmed\":{(InterviewConfig.Prewarmed ? "true" : "false")}}}";
             await SendText(init);
 
-            Debug.Log($"[Backend] init 전송 (session={sessionId}, prewarmed={InterviewConfig.Prewarmed})");
+            Debug.Log($"[Backend] init 전송 (session={sessionId}, condition={condition}, "
+                    + $"prewarmed={InterviewConfig.Prewarmed})");
         }
 
         private async void OnDestroy()

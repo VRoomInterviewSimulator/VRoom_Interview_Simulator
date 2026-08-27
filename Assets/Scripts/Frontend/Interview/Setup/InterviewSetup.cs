@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using System.IO;
 using System.Text;
 using TMPro;
@@ -36,6 +37,7 @@ namespace VRoom.Backend
         public TMP_Text companyPreview;
         public TMP_Text jobPreview;
         public TMP_Text resumePreview;
+        public TMP_Text conditionPreview;
 
         [Header("씬 이름")]
         public string interviewSceneName = "InterviewRoomScene";
@@ -51,6 +53,7 @@ namespace VRoom.Backend
         private string _company = "";
         private string _job = "";
         private string _resume = "";
+        private string _condition = "";    // 실험 조건 A, B, C
         private bool _loaded = false;      // 파일 파싱에 성공했는가
         private bool _preparing = false;   // 프리웜 진행 중인가
 
@@ -108,7 +111,7 @@ namespace VRoom.Backend
                 return;
             }
 
-            if (!TryParse(raw, out _company, out _job, out _resume, out string err))
+            if (!TryParse(raw, out _company, out _job, out _resume, out _condition, out string err))
             {
                 OnParseFailed(err);
                 return;
@@ -135,6 +138,7 @@ namespace VRoom.Backend
             InterviewConfig.Company = _company;
             InterviewConfig.JobTitle = _job;
             InterviewConfig.Resume = _resume;
+            InterviewConfig.Condition = _condition;
             InterviewConfig.IsReady = true;
 
             SceneManager.LoadScene(interviewSceneName);
@@ -161,6 +165,7 @@ namespace VRoom.Backend
             InterviewConfig.Company = _company;
             InterviewConfig.JobTitle = _job;
             InterviewConfig.Resume = _resume;
+            InterviewConfig.Condition = _condition;
             InterviewConfig.IsReady = true;
             InterviewConfig.Prewarmed = false;   // 새 파일이므로 이전 프리웜 결과는 무효
 
@@ -181,16 +186,16 @@ namespace VRoom.Backend
         // ===================================================================
         // 5. txt 파싱 (순수 함수 — 테스트 가능)
         // ===================================================================
-        private enum Section { None, Company, Job, Resume }
+        private enum Section { None, Company, Job, Resume, Condition }
 
         /// <summary>
-        /// 면접 정보 txt 를 파싱한다. [기업]과 [직무]가 모두 있어야 성공이다.
+        /// 면접 정보 txt 를 파싱한다. [기업] [직무] [조건] 이 모두 있어야 성공이다.
         /// MonoBehaviour 상태를 건드리지 않으므로 단위 테스트에서 그대로 호출할 수 있다.
         /// </summary>
         public static bool TryParse(string raw, out string company, out string job,
-                                    out string resume, out string error)
+                                    out string resume, out string condition, out string error)
         {
-            company = job = resume = "";
+            company = job = resume = condition = "";
             error = "";
 
             if (string.IsNullOrWhiteSpace(raw))
@@ -201,9 +206,10 @@ namespace VRoom.Backend
 
             var sb = new Dictionary<Section, StringBuilder>
             {
-                { Section.Company, new StringBuilder() },
-                { Section.Job,     new StringBuilder() },
-                { Section.Resume,  new StringBuilder() },
+                { Section.Company,   new StringBuilder() },
+                { Section.Job,       new StringBuilder() },
+                { Section.Resume,    new StringBuilder() },
+                { Section.Condition, new StringBuilder() },
             };
 
             Section cur = Section.None;
@@ -229,14 +235,44 @@ namespace VRoom.Backend
             company = sb[Section.Company].ToString().Trim();
             job = sb[Section.Job].ToString().Trim();
             resume = sb[Section.Resume].ToString().Trim();
+            condition = NormalizeCondition(sb[Section.Condition].ToString());
 
             if (string.IsNullOrEmpty(company) || string.IsNullOrEmpty(job))
             {
                 error = "[기업]과 [직무] 섹션이 모두 필요합니다. 파일 형식을 확인하세요.";
                 return false;
             }
+            if (string.IsNullOrEmpty(condition))
+            {
+                error = "[조건] 섹션에 실험 조건 A / B / C 중 하나를 적어야 합니다.";
+                return false;
+            }
             return true;
         }
+
+        /// <summary>
+        /// [조건] 섹션에서 A/B/C 한 글자를 뽑는다. "C", "조건 C", "C (개입)" 등을 허용한다.
+        ///
+        /// 단어 경계를 요구하는 이유: "CONDITION: B" 같은 표기에서 CONDITION 의 C 를
+        /// 조건 C 로 오인식하면 개입 조건이 아닌 참가자에게 개입이 발동한다.
+        /// </summary>
+        private static string NormalizeCondition(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return "";
+
+            string first = raw.Replace("\r\n", "\n").Split('\n')[0].ToUpperInvariant();
+            var m = Regex.Match(first, @"(?<![A-Z])[ABC](?![A-Z])");
+            return m.Success ? m.Value : "";
+        }
+
+        /// <summary>실험자 확인용 조건 설명. 참가자에게 보여선 안 된다.</summary>
+        private static string ConditionLabel(string c) => c switch
+        {
+            "A" => "A — 정적 턴제",
+            "B" => "B — 가변 페르소나",
+            "C" => "C — 가변 페르소나 및 능동 개입",
+            _ => "-",
+        };
 
         /// <summary>헤더 문자열을 섹션으로 분류한다. 부분 일치라 표기 흔들림을 허용한다.</summary>
         private static Section Classify(string header)
@@ -247,6 +283,8 @@ namespace VRoom.Backend
                 return Section.Job;
             if (header.Contains("이력") || header.Contains("자기소개") || header.Contains("경력"))
                 return Section.Resume;
+            if (header.Contains("조건") || header.Contains("실험"))
+                return Section.Condition;
 
             return Section.None;
         }
@@ -281,6 +319,7 @@ namespace VRoom.Backend
             if (jobPreview) jobPreview.text = _job;
             if (resumePreview)
                 resumePreview.text = string.IsNullOrEmpty(_resume) ? "(이력서 없음)" : _resume;
+            if (conditionPreview) conditionPreview.text = ConditionLabel(_condition);
         }
 
         private void ClearPreview()
@@ -288,6 +327,7 @@ namespace VRoom.Backend
             if (companyPreview) companyPreview.text = "-";
             if (jobPreview) jobPreview.text = "-";
             if (resumePreview) resumePreview.text = "-";
+            if (conditionPreview) conditionPreview.text = "-";
         }
 
         private void SetWarning(string msg)

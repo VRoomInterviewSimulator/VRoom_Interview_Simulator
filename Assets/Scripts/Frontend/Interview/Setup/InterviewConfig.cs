@@ -17,6 +17,7 @@ namespace VRoom.Backend
         public static bool IsReady = false;           // 파일 파싱에 성공했는가
         public static string SessionId = "default";   // 백엔드 세션 식별자
         public static bool Prewarmed = false;         // 첫 질문 음성이 백엔드에 캐시돼 있는가
+        public static string Condition = ""; // 실험 조건 A, B, C
 
         /// <summary>여러 줄로 입력된 기업명의 첫 줄만. 화면 라벨 표시용.</summary>
         public static string CompanyShort => FirstLine(Company);
