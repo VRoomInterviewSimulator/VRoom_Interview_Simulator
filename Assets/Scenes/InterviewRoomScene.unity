@@ -14864,7 +14864,11 @@ MonoBehaviour:
   volume: 1
   bufferThresholdChunks: 3
   lipSync: {fileID: 1372484131}
-  cutinClips: []
+  cutinClips:
+  - {fileID: 8300000, guid: 237d9302ecccc5f4e98f39f75887b8f3, type: 3}
+  - {fileID: 8300000, guid: 3e4171322a17cf84b91d079f5eac369e, type: 3}
+  - {fileID: 8300000, guid: 88fb9155264767245996b17ffb90ac36, type: 3}
+  - {fileID: 8300000, guid: af9e593163442b0469c1dde59aa6c951, type: 3}
   secondsPerChar: 0.18
   maxSubtitleCharacters: 85
   trimStepCharacters: 30

@@ -379,9 +379,10 @@ namespace VerbalProcess
             meaningfulPauseCount = 0;
             wasMeaningfulSilence = false;
             rmsSamples.Clear();
-
+            
             OnSpeakingStarted?.Invoke();
             Debug.Log("Speaking Started");
+            
         }
 
         private void SendChunk(int currentPosition)

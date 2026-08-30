@@ -353,6 +353,23 @@ namespace VerbalProcess
         }
 
         /// <summary>
+        /// 개입으로 현재 발화를 강제 종료한다.
+        /// 오디오 청크 큐 뒤에 들어가므로 마지막 청크가 먼저 전송된다.
+        /// 워커는 최종 전사 결과에 truncated=true를 붙인다.
+        /// </summary>
+        public Task SendUtteranceAbortAsync(FeatureData features, string reason = "")
+        {
+            string featuresJson = features != null ? JsonUtility.ToJson(features) : "{}";
+            string json = $"{{\"type\":\"utterance_abort\"," +
+                          $"\"session_id\":\"{EscapeJson(sessionId)}\"," +
+                          $"\"reason\":\"{EscapeJson(reason)}\"," +
+                          $"\"features\":{featuresJson}}}";
+
+            return EnqueuePacket(Encoding.UTF8.GetBytes(json), WebSocketMessageType.Text,
+                                 "utterance_abort", resetUtteranceStateAfterSend: true);
+        }
+
+        /// <summary>
         /// 재발화 교정 종료 신호. 어느 단어 범위를 다시 말한 것인지 함께 보낸다.
         /// 워커가 원본 전사의 해당 구간만 교체한다.
         /// </summary>
@@ -570,6 +587,8 @@ namespace VerbalProcess
         public class TranscriptionData
         {
             public string sttText;
+            public bool truncated;
+            public string utterance_id;
             public float speakingTime;
             public int pauseCount;
             public int meaningfulPauseCount;

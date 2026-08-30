@@ -108,6 +108,10 @@ namespace VerbalProcess
         private bool _yieldMeasurable = false;
         private bool _yieldReported = false;
 
+        // 백엔드 컷인 이후 현재 발화를 utterance_abort 로 닫을지 여부
+        private bool _abortRequested = false;
+        private string _abortReason = "";
+
         // ── 저신뢰 교정 상태 ──────────────────────────────────────
         private bool _isCorrectionMode = false;        // 재발화 수신을 기다리는 중인가
         private bool _isCorrectionPanelOpen = false;   // 패널이 화면에 떠 있는가
@@ -128,6 +132,7 @@ namespace VerbalProcess
                 vad.OnAudioChunkCaptured += HandleOnAudioChunkCaptured;
                 vad.OnSpeakingStarted += HandleSpeakingStarted;
                 vad.OnBargeInTrigger += HandleBargeInTrigger;
+                vad.OnUtteranceAborted += HandleUtteranceAborted;
             }
             else
             {
@@ -167,6 +172,7 @@ namespace VerbalProcess
                 vad.OnAudioChunkCaptured -= HandleOnAudioChunkCaptured;
                 vad.OnSpeakingStarted -= HandleSpeakingStarted;
                 vad.OnBargeInTrigger -= HandleBargeInTrigger;
+                vad.OnUtteranceAborted -= HandleUtteranceAborted;
             }
 
             if (sttManager != null)
@@ -363,6 +369,15 @@ namespace VerbalProcess
                 return;
             }
 
+            // InterviewerSpeaking/Monitoring 중의 마이크 감지는 에코 또는
+            // 관찰 대상 입력이다. 실제 사용자 답변이 시작된 것이 아니므로
+            // STT와 Speaker 상태를 건드리지 않는다.
+            if (_state != TurnState.UserAnswering)
+            {
+                Debug.Log($"[Pipeline] 사용자 발화 시작 무시 (state={_state})");
+                return;
+            }
+
             if (_interviewerFinishedTime > 0)
             {
                 _currentResponseTime = Time.time - _interviewerFinishedTime;
@@ -389,13 +404,24 @@ namespace VerbalProcess
 
         private async void HandleUtteranceEnded(VoiceActivityDetector.VoiceFeatures features)
         {
-            if (sttManager == null) return;
+            if (sttManager == null)
+            {
+                ClearAbortRequest();
+                return;
+            }
 
             features.responseTime = _currentResponseTime;
 
             try
             {
-                if (_isCorrectionMode)
+                if (_abortRequested)
+                {
+                    Debug.Log($"[Pipeline] Barge-in utterance aborted (reason={_abortReason}).");
+                    await sttManager.SendUtteranceAbortAsync(
+                        new FeatureData(features), _abortReason);
+                    ClearAbortRequest();
+                }
+                else if (_isCorrectionMode)
                 {
                     Debug.Log("[Pipeline] Re-speak completed. Sending Correction Feature via WebSocket...");
                     await sttManager.SendCorrectionEndUtteranceAsync(
@@ -422,8 +448,30 @@ namespace VerbalProcess
             }
             catch (Exception e)
             {
+                ClearAbortRequest();
                 Debug.LogError($"Pipeline Error (End): {e.Message}");
             }
+        }
+
+        /// <summary>
+        /// VAD가 강제 종료를 알린다.
+        /// 실제 음성이 있었으면 HandleUtteranceEnded가 feature와 함께 abort를
+        /// 전송하므로 여기서는 중복 전송하지 않는다. 음성이 없었던 경우에는
+        /// STT에 보낼 발화가 없으므로 대기 상태만 정리한다.
+        /// </summary>
+        private void HandleUtteranceAborted(bool hasAudio)
+        {
+            if (!hasAudio && _abortRequested)
+            {
+                Debug.Log("[Pipeline] Barge-in with no active audio; no STT abort payload needed.");
+                ClearAbortRequest();
+            }
+        }
+
+        private void ClearAbortRequest()
+        {
+            _abortRequested = false;
+            _abortReason = "";
         }
 
         /// <summary>
@@ -543,13 +591,20 @@ namespace VerbalProcess
             // ForceEndUtterance() 가 isSpeaking 을 지우기 전에 기록해야 한다.
             _yieldMeasurable = (vad != null && vad.IsSpeaking);
 
+            // ForceEndUtterance()가 발생시키는 OnUtteranceEnded가
+            // utterance_end 대신 utterance_abort를 선택하도록 먼저 표시한다.
+            _abortRequested = true;
+            _abortReason = msg.reason ?? "";
+
             // 1·2. 상태 전이 (SetTurnState 가 MicMode 를 Monitoring 으로 내린다)
             SetTurnState(TurnState.BargeInPending);
 
             // 3. STT 에 발화 강제 확정.
-            //    현재는 기존 utterance_end 경로를 재사용한다.
-            //    음성 담당의 utterance_abort 구현이 끝나면 그쪽으로 교체한다.
-            vad.ForceEndUtterance();
+            //    마지막 tail chunk가 먼저 큐에 들어간 뒤 utterance_abort가 전송된다.
+            if (vad != null)
+                vad.ForceEndUtterance();
+            else
+                ClearAbortRequest();
 
             // 4. 애니메이터 트리거 — 몸짓이 소리보다 먼저(수백 ms 선행).
             //    지연 은폐용 편법이 아니라 인간 개입 행동의 실제 시간 구조 모사다.
