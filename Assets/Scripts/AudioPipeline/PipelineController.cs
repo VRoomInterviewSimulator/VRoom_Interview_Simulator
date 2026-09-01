@@ -244,6 +244,7 @@ namespace VerbalProcess
 
                 case TurnState.BargeInPending:
                     vad?.SetMicMode(MicMode.Monitoring);
+                    vad?.EnterEchoGuard();
                     _silenceTimerStart = -1f;
                     _bargeInDeadline = Time.time + bargeInFallbackTimeout;
                     break;
@@ -522,6 +523,12 @@ namespace VerbalProcess
                 return;
             }
 
+            if (_state == TurnState.BargeInPending || _state == TurnState.Interrupting)
+            {
+                Debug.Log($"[Pipeline] STT skipped during barge-in (state={_state}) - 상태 유지");
+                return;
+            }
+
             Debug.Log("[Pipeline] STT skipped (empty transcription). Re-enabling VAD without touching Speaker.");
             SetTurnState(TurnState.UserAnswering);
         }
@@ -614,7 +621,7 @@ namespace VerbalProcess
             expression?.Apply(msg.expression_id);
 
             // 6. 컷인 프리셋 재생. 클립이 없으면 조용히 통과하고 개입 대사로 직행한다.
-            speaker.EnqueueCutin();
+            speaker.EnqueueCutin(msg.bargein_type);
 
             // Type B 는 개입 대사(발화 1) 뒤에 후속 질문(발화 2)이 따라온다.
             _awaitingCutoffQuestion = (msg.bargein_type == "CUTOFF");

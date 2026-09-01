@@ -40,8 +40,14 @@ namespace VerbalProcess
         [SerializeField] private uLipSync.uLipSync lipSync;
 
         [Header("BargeIn Cut-in")]
-        [Tooltip("컷인 프리셋. 현재 미사용(음성 담당 작업 대기). 44100Hz Mono 여야 한다.")]
-        [SerializeField] private AudioClip[] cutinClips;
+        [Tooltip("Type A(REDIRECT) 컷인 프리셋. '잠깐', '잠시만요' 처럼\n"
+               + "말을 멈추게만 하고 다음으로 넘어가지 않는 문구여야 한다.\n"
+               + "44100Hz Mono 필수.")]
+        [SerializeField] private AudioClip[] redirectCutinClips;
+
+        [Tooltip("Type B(CUTOFF) 컷인 프리셋. '네, 거기까지' 처럼\n"
+               + "답변을 종료시키는 문구를 쓴다. 44100Hz Mono 필수.")]
+        [SerializeField] private AudioClip[] cutoffCutinClips;
 
         [Header("Subtitle Settings")]
         [Tooltip("글자당 예상 발화 시간(초). 자막 진행률 추정에만 쓰인다.")]
@@ -254,16 +260,17 @@ namespace VerbalProcess
         }
 
         /// <summary>컷인 프리셋을 무작위로 하나 재생한다. 클립이 없으면 조용히 통과한다.</summary>
-        public void EnqueueCutin()
+        public void EnqueueCutin(string bargeinType)
         {
-            if (cutinClips == null || cutinClips.Length == 0)
+            AudioClip[] pool = (bargeinType == "REDIRECT") ? redirectCutinClips : cutoffCutinClips;
+
+            if (pool == null || pool.Length == 0)
             {
-                // 컷인 미사용이 현재 정상 상태다. 경고로 올리면 진짜 문제를 놓친다.
-                Debug.Log("[Speaker] 컷인 미설정 - 개입 대사로 직행");
+                Debug.Log($"[Speaker] 컷인 미설정 (type={bargeinType}) - 개입 대사로 직행");
                 return;
             }
 
-            EnqueueLocalClip(cutinClips[UnityEngine.Random.Range(0, cutinClips.Length)]);
+            EnqueueLocalClip(pool[UnityEngine.Random.Range(0, pool.Length)]);
         }
 
         // ===================================================================

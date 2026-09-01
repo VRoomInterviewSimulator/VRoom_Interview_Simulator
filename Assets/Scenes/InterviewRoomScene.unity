@@ -7827,7 +7827,7 @@ MonoBehaviour:
   bufferLengthSeconds: 300
   meaningfulPauseThreshold: 0.4
   lowVolumeRatioThreshold: 0.3
-  longAnswerThreshold: 15
+  longAnswerThreshold: 90
   echoGuardMultiplier: 2.5
   echoGuardBlindSec: 1
 --- !u!114 &817680392
@@ -7864,7 +7864,7 @@ MonoBehaviour:
   backend: {fileID: 2146786189}
   interviewerDriver: {fileID: 1535098251}
   expression: {fileID: 1535098252}
-  longSilenceThreshold: 10
+  longSilenceThreshold: 15
   bargeInFallbackTimeout: 10
   postBargeInTimeout: 12
   reactionWindowSec: 5
@@ -14864,11 +14864,12 @@ MonoBehaviour:
   volume: 1
   bufferThresholdChunks: 3
   lipSync: {fileID: 1372484131}
-  cutinClips:
-  - {fileID: 8300000, guid: 237d9302ecccc5f4e98f39f75887b8f3, type: 3}
-  - {fileID: 8300000, guid: 3e4171322a17cf84b91d079f5eac369e, type: 3}
+  redirectCutinClips:
   - {fileID: 8300000, guid: 88fb9155264767245996b17ffb90ac36, type: 3}
   - {fileID: 8300000, guid: af9e593163442b0469c1dde59aa6c951, type: 3}
+  cutoffCutinClips:
+  - {fileID: 8300000, guid: 3e4171322a17cf84b91d079f5eac369e, type: 3}
+  - {fileID: 8300000, guid: 237d9302ecccc5f4e98f39f75887b8f3, type: 3}
   secondsPerChar: 0.18
   maxSubtitleCharacters: 85
   trimStepCharacters: 30
